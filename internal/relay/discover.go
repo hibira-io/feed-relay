@@ -654,14 +654,23 @@ func routeParam(name string, optional bool, raw json.RawMessage) RouteParam {
 // popular namespaces come first when the search is empty.
 var popular = []string{"github", "youtube", "telegram", "reddit", "bilibili", "twitter", "instagram", "spotify", "steam", "producthunt", "hackernews", "v2ex", "zhihu", "weibo", "pixiv", "nhk", "bbc"}
 
-// SearchRoutes finds RSSHub routes by site, name or path.
-func (r *Relay) SearchRoutes(ctx context.Context, query, lang string, limit int) ([]RouteInfo, error) {
+// RoutePage is one page of SearchRoutes results.
+type RoutePage struct {
+	Routes []RouteInfo `json:"routes"`
+	Total  int         `json:"total"`
+	Offset int         `json:"offset"`
+}
+
+// SearchRoutes finds RSSHub routes by site, name or path, best matches first,
+// and returns limit of them starting at offset.
+func (r *Relay) SearchRoutes(ctx context.Context, query, lang string, offset, limit int) (RoutePage, error) {
 	ctx, cancel := context.WithTimeout(ctx, 45*time.Second)
 	defer cancel()
 	all, err := r.routeCatalog(ctx, catalogLang(lang))
 	if err != nil {
-		return nil, err
+		return RoutePage{}, err
 	}
+	offset = max(offset, 0)
 	if limit <= 0 || limit > 100 {
 		limit = 40
 	}
@@ -711,12 +720,12 @@ func (r *Relay) SearchRoutes(ctx context.Context, query, lang string, limit int)
 		hits = append(hits, hit{score, i})
 	}
 	sort.SliceStable(hits, func(a, b int) bool { return hits[a].score > hits[b].score })
-	out := []RouteInfo{}
-	for _, h := range hits {
-		if len(out) == limit {
+	out := RoutePage{Routes: []RouteInfo{}, Total: len(hits), Offset: offset}
+	for _, h := range hits[min(offset, len(hits)):] {
+		if len(out.Routes) == limit {
 			break
 		}
-		out = append(out, all[h.i])
+		out.Routes = append(out.Routes, all[h.i])
 	}
 	return out, nil
 }

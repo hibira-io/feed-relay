@@ -56,6 +56,49 @@ func (r *Relay) FeedInfos() []FeedInfo {
 	return out
 }
 
+// FilterFeeds lists the feeds whose name, URL, channels or event contain
+// every word of query, and whose status is status ("running", "paused",
+// "failing" or empty for any). It returns limit of them from offset, and the
+// number that matched.
+func (r *Relay) FilterFeeds(query, status string, offset, limit int) ([]FeedInfo, int) {
+	words := strings.Fields(strings.ToLower(query))
+	var matched []FeedInfo
+	for _, v := range r.FeedInfos() {
+		f := v.Feed
+		switch status {
+		case "running":
+			if f.Disabled {
+				continue
+			}
+		case "paused":
+			if !f.Disabled {
+				continue
+			}
+		case "failing":
+			if f.Disabled || v.Status.LastError == "" {
+				continue
+			}
+		}
+		text := strings.ToLower(strings.Join(append([]string{f.Name, f.URL, f.Event}, f.Channels...), " "))
+		ok := true
+		for _, w := range words {
+			if !strings.Contains(text, w) {
+				ok = false
+				break
+			}
+		}
+		if ok {
+			matched = append(matched, v)
+		}
+	}
+	offset = min(max(offset, 0), len(matched))
+	end := len(matched)
+	if limit > 0 {
+		end = min(offset+limit, end)
+	}
+	return append([]FeedInfo{}, matched[offset:end]...), len(matched)
+}
+
 // FindFeed finds a feed by name, or by the id the console uses.
 func (r *Relay) FindFeed(nameOrID string) (*Feed, error) {
 	if rn := r.feed(nameOrID); rn != nil {

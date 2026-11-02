@@ -603,3 +603,57 @@ window.FEED_RELAY_I18N = {
     fillIn: 'Hãy điền {names}', use: 'Dùng', pickHint: 'Chọn một mục để điền URL feed.',
   });
 })();
+
+// Searching and paging lists.
+(() => {
+  const d = window.FEED_RELAY_I18N.dict;
+  Object.assign(d.en, {
+    searchFeeds: 'Search name, URL or channel', pages: 'Pages',
+    filterAll: 'All', filterRunning: 'Running', filterPaused: 'Paused', filterFailing: 'Failing',
+    noMatch: 'No feeds match.', clearFilter: 'Clear search',
+    prevPage: 'Previous page', nextPage: 'Next page', pageOf: '{from}–{to} of {total}',
+    routesShown: '{shown} of {total} routes', loadMore: 'Show {n} more',
+  });
+  Object.assign(d.ja, {
+    searchFeeds: '名前・URL・チャンネルで検索', pages: 'ページ',
+    filterAll: 'すべて', filterRunning: '実行中', filterPaused: '一時停止', filterFailing: 'エラー',
+    noMatch: '一致するフィードはありません。', clearFilter: '検索をクリア',
+    prevPage: '前のページ', nextPage: '次のページ', pageOf: '{total} 件中 {from}–{to}',
+    routesShown: '{total} 件中 {shown} 件のルート', loadMore: 'さらに {n} 件表示',
+  });
+  Object.assign(d.ko, {
+    searchFeeds: '이름, URL, 채널로 검색', pages: '페이지',
+    filterAll: '전체', filterRunning: '실행 중', filterPaused: '일시 중지', filterFailing: '오류',
+    noMatch: '일치하는 피드가 없습니다.', clearFilter: '검색 지우기',
+    prevPage: '이전 페이지', nextPage: '다음 페이지', pageOf: '{total}개 중 {from}–{to}',
+    routesShown: '경로 {total}개 중 {shown}개', loadMore: '{n}개 더 보기',
+  });
+  Object.assign(d['zh-TW'], {
+    searchFeeds: '搜尋名稱、網址或頻道', pages: '分頁',
+    filterAll: '全部', filterRunning: '執行中', filterPaused: '已暫停', filterFailing: '失敗',
+    noMatch: '沒有符合的 Feed。', clearFilter: '清除搜尋',
+    prevPage: '上一頁', nextPage: '下一頁', pageOf: '第 {from}–{to} 個，共 {total} 個',
+    routesShown: '顯示 {shown} / {total} 個路由', loadMore: '再顯示 {n} 個',
+  });
+  Object.assign(d['zh-CN'], {
+    searchFeeds: '搜索名称、地址或频道', pages: '分页',
+    filterAll: '全部', filterRunning: '运行中', filterPaused: '已暂停', filterFailing: '失败',
+    noMatch: '没有匹配的 Feed。', clearFilter: '清除搜索',
+    prevPage: '上一页', nextPage: '下一页', pageOf: '第 {from}–{to} 个，共 {total} 个',
+    routesShown: '显示 {shown} / {total} 个路由', loadMore: '再显示 {n} 个',
+  });
+  Object.assign(d.th, {
+    searchFeeds: 'ค้นหาชื่อ URL หรือช่อง', pages: 'หน้า',
+    filterAll: 'ทั้งหมด', filterRunning: 'กำลังทำงาน', filterPaused: 'หยุดชั่วคราว', filterFailing: 'ล้มเหลว',
+    noMatch: 'ไม่มีฟีดที่ตรงกัน', clearFilter: 'ล้างการค้นหา',
+    prevPage: 'หน้าก่อน', nextPage: 'หน้าถัดไป', pageOf: '{from}–{to} จาก {total}',
+    routesShown: 'เส้นทาง {shown} จาก {total}', loadMore: 'แสดงเพิ่มอีก {n}',
+  });
+  Object.assign(d.vi, {
+    searchFeeds: 'Tìm theo tên, URL hoặc kênh', pages: 'Trang',
+    filterAll: 'Tất cả', filterRunning: 'Đang chạy', filterPaused: 'Tạm dừng', filterFailing: 'Lỗi',
+    noMatch: 'Không có feed phù hợp.', clearFilter: 'Xoá tìm kiếm',
+    prevPage: 'Trang trước', nextPage: 'Trang sau', pageOf: '{from}–{to} trên {total}',
+    routesShown: '{shown} trên {total} route', loadMore: 'Hiện thêm {n}',
+  });
+})();
