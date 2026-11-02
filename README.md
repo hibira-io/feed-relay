@@ -68,6 +68,8 @@ The console is in English, 日本語, 한국어, 繁體中文, 简体中文, ไ
 
 Feeds added in the console are saved in `feeds.json` next to the state file and survive restarts. Feeds from the config file are shown with a lock and stay read-only.
 
+**Export and import.** The download button exports every feed as a JSON backup (all settings, request headers included, so keep it private) or as OPML for a feed reader. The upload button takes either back: it shows which feeds will be added and which are skipped (same name, same URL, or a problem) before anything changes. OPML has no channels, so you pick the channels its feeds go to; URLs on your `rsshub_url` turn back into routes. Imported feeds start by remembering their current items, so an import never sends old items.
+
 **Live updates.** The console subscribes to the private channel `private-feed-relay` on your Hibira app. When a feed is added, changed, paused or deleted, the relay publishes it there, so every open console refreshes at once and shows a toast when an AI agent made the change over MCP. On the Free plan, add the console's origin (for example `http://localhost:8080`) to the app's **allowed origins**. Until you do, the console shows "Live off" and works without live updates.
 
 ## MCP server
@@ -88,6 +90,7 @@ claude mcp add --transport http feed-relay http://localhost:8080/mcp --header "A
 | `pause_feed` | pause or resume |
 | `check_feed` | check now and send what is new |
 | `send_test_item` | send the newest item again, to test the wiring |
+| `export_feeds`, `import_feeds` | a JSON backup or OPML of every feed, and adding feeds from one (`dry_run` shows the plan first) |
 
 Ask your agent something like "watch the GitHub releases of vercel/next.js and send them to the `releases` channel", and it finds the RSSHub route, previews it, then adds it.
 
@@ -171,7 +174,7 @@ go run ./cmd/feed-relay -config examples/feed-relay.yaml
 
 ## 中文摘要
 
-`feed-relay` 把任何 RSS／Atom／JSON Feed（包含所有 RSSHub 路由）的新條目，即時轉成 Hibira 的 channel 事件、App 推播或通知收件匣。單一 Go 執行檔或 Docker 映像，跟 RSSHub 放在一起跑即可。設定 `ADMIN_PASSWORD` 即可在瀏覽器的 Web 主控台新增、預覽、暫停、測試 feed，不必手打網址：貼上任何網頁即可列出它提供的 feed 與對應的 RSSHub 路由，也能直接瀏覽 RSSHub 路由並填入參數（主控台支援七種語言與深色模式）；設定 `MCP_TOKEN` 後，AI agent 可透過 `/mcp` 管理 feed，主控台會經由 Hibira 即時收到變更並跳出提示（Free 方案需把主控台網址加入 allowed origins）。首次啟動只記住既有條目、不會洗版；已送出的條目記在 state 檔，重啟也不會重送；支援 ETag／304 與 WebSub（設定 `public_url` 後，YouTube 等有 hub 的 feed 可秒級送達）。事件預設控制在 3,500 bytes 內，符合 Free 方案 4 KB 上限。請只轉發你有權使用的 feed，並遵守來源網站條款。
+`feed-relay` 把任何 RSS／Atom／JSON Feed（包含所有 RSSHub 路由）的新條目，即時轉成 Hibira 的 channel 事件、App 推播或通知收件匣。單一 Go 執行檔或 Docker 映像，跟 RSSHub 放在一起跑即可。設定 `ADMIN_PASSWORD` 即可在瀏覽器的 Web 主控台新增、預覽、暫停、測試 feed，不必手打網址：貼上任何網頁即可列出它提供的 feed 與對應的 RSSHub 路由，也能直接瀏覽 RSSHub 路由並填入參數（主控台支援七種語言與深色模式）；feed 可匯出成 JSON 備份或 OPML，也能從備份或其他閱讀器的 OPML 匯入（先預覽要新增與略過的項目，匯入時不會送出舊條目）；設定 `MCP_TOKEN` 後，AI agent 可透過 `/mcp` 管理 feed，主控台會經由 Hibira 即時收到變更並跳出提示（Free 方案需把主控台網址加入 allowed origins）。首次啟動只記住既有條目、不會洗版；已送出的條目記在 state 檔，重啟也不會重送；支援 ETag／304 與 WebSub（設定 `public_url` 後，YouTube 等有 hub 的 feed 可秒級送達）。事件預設控制在 3,500 bytes 內，符合 Free 方案 4 KB 上限。請只轉發你有權使用的 feed，並遵守來源網站條款。
 
 ## License
 

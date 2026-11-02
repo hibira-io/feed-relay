@@ -21,6 +21,9 @@
     book: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/>',
     chevron: '<path d="m9 18 6-6-6-6"/>',
     chevronLeft: '<path d="m15 18-6-6 6-6"/>',
+    download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>',
+    upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>',
+    file: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>',
   };
   const icon = (name) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[name]}</svg>`;
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -93,13 +96,19 @@
     });
     root.querySelectorAll('[data-pref="lang"]').forEach((b) => (b.onclick = (e) => { e.stopPropagation(); openLangMenu(b); }));
   }
-  function openLangMenu(btn) {
+  // popMenu opens a menu under btn, or closes the one that is open. onPick
+  // gets the chosen item's button.
+  function popMenu(btn, cls, html, onPick) {
     const open = $('.menu');
-    if (open) { open.remove(); btn.setAttribute('aria-expanded', 'false'); return; }
+    if (open) {
+      open.remove();
+      document.querySelectorAll('[aria-expanded="true"]').forEach((b) => b.setAttribute('aria-expanded', 'false'));
+      if (open.parentElement === btn.parentElement) return;
+    }
     const m = document.createElement('div');
-    m.className = 'menu';
+    m.className = 'menu ' + cls;
     m.setAttribute('role', 'menu');
-    m.innerHTML = I18N.langs.map(([code, label]) => `<button type="button" role="menuitemradio" aria-checked="${code === lang}" data-lang="${code}" lang="${code}">${icon('check')}<span>${esc(label)}</span></button>`).join('');
+    m.innerHTML = html;
     btn.parentElement.append(m);
     btn.setAttribute('aria-expanded', 'true');
     const close = () => { m.remove(); btn.setAttribute('aria-expanded', 'false'); document.removeEventListener('click', close); document.removeEventListener('keydown', onKey); };
@@ -107,16 +116,22 @@
     document.addEventListener('click', close);
     document.addEventListener('keydown', onKey);
     m.onclick = (e) => {
-      const b = e.target.closest('[data-lang]');
+      const b = e.target.closest('button');
       if (!b) return;
+      close();
+      onPick(b);
+    };
+    (m.querySelector('[aria-checked="true"]') || m.querySelector('button')).focus();
+  }
+  function openLangMenu(btn) {
+    const html = I18N.langs.map(([code, label]) => `<button type="button" role="menuitemradio" aria-checked="${code === lang}" data-lang="${code}" lang="${code}">${icon('check')}<span>${esc(label)}</span></button>`).join('');
+    popMenu(btn, '', html, (b) => {
       lang = b.dataset.lang;
       store.set('feed-relay-lang', lang);
       document.documentElement.lang = lang;
       document.title = t('appName');
-      close();
       if (state) { renderMain(); } else showLogin();
-    };
-    (m.querySelector('[aria-checked="true"]') || m.querySelector('button')).focus();
+    });
   }
 
   // --- api ---
@@ -135,6 +150,7 @@
     if (!res.ok) {
       const err = new Error(data.error || t('requestFailed', { status: res.status }));
       err.problems = data.problems;
+      err.code = data.code;
       throw err;
     }
     return data;
@@ -228,6 +244,10 @@
           <div><h1>${esc(t('feeds'))}</h1><p>${esc(t('feedsSub'))}</p></div>
           <div class="grow"></div>
           <div class="stats" id="stats"></div>
+          <div class="row">
+            <span class="menu-wrap"><button class="icon-btn" id="export" data-tip="${esc(t('exportFeeds'))}" aria-label="${esc(t('exportFeeds'))}" aria-haspopup="menu" aria-expanded="false">${icon('download')}</button></span>
+            <button class="icon-btn" id="import" data-tip="${esc(t('importFeeds'))}" aria-label="${esc(t('importFeeds'))}">${icon('upload')}</button>
+          </div>
           <button class="btn primary" id="add">${icon('plus')}${esc(t('addFeed'))}</button>
         </div>
         <div class="tools" id="tools">
@@ -239,6 +259,8 @@
       </div>`;
     $('#logout').onclick = async () => { await api('POST', '/api/logout'); stopLive(); showLogin(); };
     $('#add').onclick = () => openEditor(null);
+    $('#export').onclick = (e) => { e.stopPropagation(); openExportMenu(e.currentTarget); };
+    $('#import').onclick = () => openImport();
     $('#q').oninput = (e) => { view.q = e.target.value; view.page = 0; renderList(); };
     $('#q').onkeydown = (e) => { if (e.key === 'Escape' && e.target.value) { e.target.value = ''; view.q = ''; view.page = 0; renderList(); } };
     $('#status-filter').onclick = (e) => {
@@ -298,6 +320,7 @@
     const feeds = state.feeds;
     const sent = feeds.reduce((n, v) => n + (v.status.sent || 0), 0);
     const errs = feeds.filter((v) => v.status.last_error && !v.feed.disabled).length;
+    $('#export').disabled = feeds.length === 0;
     $('#stats').innerHTML = `
       <div class="stat"><b>${feeds.length}</b><span>${esc(t('statFeeds', { n: feeds.length }))}</span></div>
       <div class="stat"><b>${sent}</b><span>${esc(t('statSent'))}</span></div>
@@ -309,8 +332,10 @@
         <div class="empty-mark"><div class="mark">${icon('rss')}</div></div>
         <h2>${esc(t('noFeeds'))}</h2>
         <p>${state.rsshub_url ? tHtml('emptyTextRsshub', { route: '<code>/github/release/owner/repo</code>' }) : esc(t('emptyText'))}</p>
-        <button class="btn primary" id="add2">${icon('plus')}${esc(t('addFirst'))}</button></div>`;
+        <div class="empty-actions"><button class="btn primary" id="add2">${icon('plus')}${esc(t('addFirst'))}</button>
+        <button class="btn" id="import2">${icon('upload')}${esc(t('orImport'))}</button></div></div>`;
       $('#add2').onclick = () => openEditor(null);
+      $('#import2').onclick = () => openImport();
       return;
     }
     const words = view.q.toLowerCase().split(/\s+/).filter(Boolean);
@@ -418,13 +443,116 @@
     m.querySelector('[data-x]').focus();
   }
 
+  // --- export and import ---
+  function openExportMenu(btn) {
+    const html = [['json', 'exportJson', 'exportJsonHint'], ['opml', 'exportOpml', 'exportOpmlHint']].map(([f, label, hint]) =>
+      `<button type="button" role="menuitem" data-format="${f}">${icon('file')}<span><b>${esc(t(label))}</b><small>${esc(t(hint))}</small></span></button>`).join('');
+    popMenu(btn, 'wide', html, (b) => {
+      const a = document.createElement('a');
+      a.href = `/api/export?format=${b.dataset.format}`;
+      a.download = '';
+      document.body.append(a);
+      a.click();
+      a.remove();
+    });
+  }
+
+  function openImport() {
+    const scrim = document.createElement('div');
+    scrim.className = 'scrim';
+    const m = document.createElement('div');
+    m.className = 'modal wide';
+    m.setAttribute('role', 'dialog');
+    m.setAttribute('aria-modal', 'true');
+    m.setAttribute('aria-labelledby', 'imp-title');
+    m.innerHTML = `<h2 id="imp-title">${esc(t('importFeeds'))}</h2>
+      <p>${esc(t('importText'))}</p>
+      <label class="drop" tabindex="0">${icon('upload')}<span><b>${esc(t('chooseFile'))}</b><span class="hint">${esc(t('dropHint'))}</span></span>
+        <input type="file" accept=".json,.opml,.xml,application/json,text/xml,text/x-opml" hidden></label>
+      <div id="imp-channels" class="field hidden"><label>${esc(t('importChannels'))}</label>${chips('imp-ch', [], t('channelsPh'))}<span class="hint">${esc(t('importChannelsHint'))}</span></div>
+      <div id="imp-out"></div>
+      <div class="row"><button class="btn" data-x>${esc(t('cancel'))}</button><button class="btn primary" data-go disabled>${icon('upload')}<span>${esc(t('importFeeds'))}</span></button></div>`;
+    const close = () => { scrim.remove(); m.remove(); document.removeEventListener('keydown', onKey); obs.disconnect(); };
+    const onKey = (e) => { if (e.key === 'Escape') close(); };
+    document.addEventListener('keydown', onKey);
+    scrim.onclick = close;
+    m.querySelector('[data-x]').onclick = close;
+    wireChips(m);
+
+    const drop = m.querySelector('.drop'), input = drop.querySelector('input'), out = m.querySelector('#imp-out'), go = m.querySelector('[data-go]');
+    let data = null, plan = null, seq = 0;
+    drop.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } };
+    drop.ondragover = (e) => { e.preventDefault(); drop.classList.add('over'); };
+    drop.ondragleave = () => drop.classList.remove('over');
+    drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove('over'); if (e.dataTransfer.files[0]) read(e.dataTransfer.files[0]); };
+    input.onchange = () => { if (input.files[0]) read(input.files[0]); input.value = ''; };
+
+    async function read(file) {
+      data = null;
+      go.disabled = true;
+      if (file.size > 5 << 20) { out.innerHTML = `<div class="problems">${esc(t('fileTooBig'))}</div>`; return; }
+      drop.querySelector('b').textContent = file.name;
+      out.innerHTML = `<p class="hint">${esc(t('reading'))}</p>`;
+      data = await file.text();
+      const opml = data.trimStart().startsWith('<');
+      const box = m.querySelector('#imp-channels');
+      if (opml && !chipValues(m, 'imp-ch').length) box.querySelector('input').insertAdjacentHTML('beforebegin', tag('feeds'));
+      box.classList.toggle('hidden', !opml);
+      check();
+    }
+
+    async function check() {
+      if (data === null) return;
+      const n = ++seq;
+      go.disabled = true;
+      try {
+        plan = await api('POST', '/api/import', { data, channels: chipValues(m, 'imp-ch'), dry_run: true });
+      } catch (err) {
+        if (n !== seq) return;
+        plan = null;
+        const box = m.querySelector('#imp-channels');
+        box.classList.add('hidden');
+        out.innerHTML = `<div class="problems">${esc(err.problems ? err.problems.join(' ') : err.code === 'format' ? t('notImportable') : err.message)}</div>`;
+        return;
+      }
+      if (n !== seq) return;
+      if (plan.skipped.some((s) => s.reason === 'invalid' && (s.problems || []).some((p) => p.includes('goes nowhere')))) m.querySelector('#imp-channels').classList.remove('hidden');
+      const badge = (s) => s.reason === 'exists' ? `<span class="chip">${esc(t('importExists'))}</span>`
+        : s.reason === 'same_url' ? `<span class="chip">${esc(t('importSameUrl', { name: s.other }))}</span>`
+          : `<span class="chip err" data-tip="${esc((s.problems || []).join(' '))}" data-tip-end data-tip-wrap tabindex="0">${esc(t('importInvalid'))}</span>`;
+      const rows = [...plan.added.map((a) => [a, `<span class="chip ok">${esc(t('importNew'))}</span>`]), ...plan.skipped.map((s) => [s, badge(s)])];
+      out.innerHTML = `<div class="imp-sum">${esc(t('importSummary', { add: plan.added.length, skip: plan.skipped.length }))}</div>
+        <ul class="imp-list">${rows.map(([f, b]) => `<li class="${f.reason ? 'skip' : ''}"><span class="t"><b>${esc(f.name)}</b><code>${esc(f.url)}</code></span>${b}</li>`).join('')}</ul>`;
+      go.querySelector('span').textContent = t('importN', { n: plan.added.length });
+      go.disabled = plan.added.length === 0;
+    }
+    const obs = new MutationObserver(() => check());
+    obs.observe(m.querySelector('[data-chips="imp-ch"]'), { childList: true });
+
+    go.onclick = async () => {
+      go.disabled = true;
+      try {
+        const res = await api('POST', '/api/import', { data, channels: chipValues(m, 'imp-ch') });
+        toast(t('importedN', { n: res.added.length }));
+        close();
+        state = await api('GET', '/api/state');
+        renderList();
+      } catch (err) {
+        toast(err.problems ? err.problems.join(' ') : err.message, 'err');
+        go.disabled = false;
+      }
+    };
+    document.body.append(scrim, m);
+    drop.focus();
+  }
+
   // --- live updates through Hibira ---
   // A tiny Pusher-protocol client: the relay publishes feeds.changed on a
   // private channel whenever a feed changes, and this page listens.
   function mcpText(e) {
     const key = e.action === 'updated' ? (e.was && e.was !== e.feed ? 'mcpRenamed' : 'mcpChanged')
-      : { added: 'mcpAdded', deleted: 'mcpDeleted', paused: 'mcpPaused', resumed: 'mcpResumed' }[e.action] || 'mcpChanged';
-    return t(key, { feed: e.feed, was: e.was });
+      : { added: 'mcpAdded', deleted: 'mcpDeleted', paused: 'mcpPaused', resumed: 'mcpResumed', imported: 'mcpImported' }[e.action] || 'mcpChanged';
+    return t(key, { feed: e.feed, was: e.was, n: e.action === 'imported' ? Number(e.feed) : undefined });
   }
 
   function setLive(status, reason) {

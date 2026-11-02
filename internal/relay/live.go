@@ -21,8 +21,8 @@ const LiveChannel = "private-feed-relay"
 
 // LiveEvent is published on LiveChannel when a feed changes.
 type LiveEvent struct {
-	Action string `json:"action"`        // added, updated, deleted, paused, resumed
-	Feed   string `json:"feed"`          // the feed's name
+	Action string `json:"action"`        // added, updated, deleted, paused, resumed, imported
+	Feed   string `json:"feed"`          // the feed's name; for imported, how many feeds
 	Was    string `json:"was,omitempty"` // the old name, when renamed
 	By     string `json:"by"`            // console or mcp
 	At     string `json:"at"`

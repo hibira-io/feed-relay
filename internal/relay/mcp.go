@@ -94,6 +94,21 @@ type testResult struct {
 	Event    string   `json:"event"`
 }
 
+type exportInput struct {
+	Format string `json:"format,omitempty" jsonschema:"json (default) for a full backup with every setting, or opml for a feed reader"`
+}
+
+type exportResult struct {
+	Format string `json:"format"`
+	Data   string `json:"data"`
+}
+
+type importInput struct {
+	Data     string   `json:"data" jsonschema:"the text of a feed-relay JSON backup, a JSON list of feeds, or an OPML file"`
+	Channels []string `json:"channels,omitempty" jsonschema:"channels for feeds that have none, such as every feed from OPML"`
+	DryRun   bool     `json:"dry_run,omitempty" jsonschema:"true to only report what would be added and skipped"`
+}
+
 type deleted struct {
 	Deleted string `json:"deleted"`
 }
@@ -191,6 +206,24 @@ func (r *Relay) mcpServer() *mcp.Server {
 				return nil, nil, err
 			}
 			return nil, testResult{Item: it, Channels: f.Channels, Event: f.Event}, nil
+		})
+	mcp.AddTool(s, &mcp.Tool{Name: "export_feeds", Description: "Export every feed: format json is a full backup that import_feeds restores (it includes request headers, which may hold keys); opml lists names and URLs for a feed reader.", Annotations: readOnly},
+		func(_ context.Context, _ *mcp.CallToolRequest, in exportInput) (*mcp.CallToolResult, any, error) {
+			if in.Format == "opml" {
+				raw, err := r.ExportOPML()
+				return result(exportResult{Format: "opml", Data: string(raw)}, err)
+			}
+			raw, err := r.ExportJSON()
+			return result(exportResult{Format: "json", Data: string(raw)}, err)
+		})
+	mcp.AddTool(s, &mcp.Tool{Name: "import_feeds", Description: "Add the feeds of a JSON backup or an OPML file. Feeds whose name or URL is already watched, and feeds with problems, are skipped and listed. Imported feeds only remember their current items. Try dry_run first.",
+		Annotations: &mcp.ToolAnnotations{OpenWorldHint: &yes, DestructiveHint: &no}},
+		func(_ context.Context, _ *mcp.CallToolRequest, in importInput) (*mcp.CallToolResult, any, error) {
+			feeds, format, err := r.ParseImport([]byte(in.Data))
+			if err != nil {
+				return nil, nil, err
+			}
+			return result(r.ImportFeeds(feeds, in.Channels, format, in.DryRun, "mcp"))
 		})
 	return s
 }
