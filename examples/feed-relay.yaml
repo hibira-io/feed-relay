@@ -1,0 +1,42 @@
+# feed-relay config. ${VAR} is read from the environment.
+hibira:
+  url: https://ws.hibira.io        # or http://localhost:6001 for a local server
+  app_id: ${HIBIRA_APP_ID}
+  key: ${HIBIRA_APP_KEY}
+  secret: ${HIBIRA_APP_SECRET}     # keep it in .env, never in git
+  # For push notifications, from the app's Push tab:
+  # push_instance_id: ${HIBIRA_PUSH_INSTANCE_ID}
+  # push_secret_key: ${HIBIRA_PUSH_SECRET_KEY}
+
+# Set a public https URL to get WebSub pushes (seconds instead of polling).
+# public_url: https://relay.example.com
+listen: ":8080"
+state_file: /data/state.json
+
+defaults:
+  interval: 5m        # at least 30s; be polite to the sites you read
+  event: new-item
+
+feeds:
+  # Any RSSHub route, from your own RSSHub (see docker-compose.yml)
+  - name: pusher-server releases
+    url: http://rsshub:1200/github/release/hibira-io/pusher-server
+    channel: releases
+
+  # Any RSS, Atom or JSON Feed
+  - name: go blog
+    url: https://go.dev/blog/feed.atom
+    channels: [news, dashboard]
+    backfill: 1       # also send the newest existing post on the first run
+
+  # YouTube channel feeds announce a WebSub hub: with public_url set,
+  # new videos arrive within seconds.
+  # - name: my channel
+  #   url: https://www.youtube.com/feeds/videos.xml?channel_id=UCxxxxxxxx
+  #   channel: videos
+  #   push:
+  #     interests: [videos]
+  #     title: New video
+  #   inbox:
+  #     users: [ann, bob]
+  #     category: videos

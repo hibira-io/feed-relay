@@ -1,0 +1,16 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Live feed</title>
+<ul id="items"></ul>
+<script src="https://cdn.jsdelivr.net/npm/pusher-js@8.4.0/dist/web/pusher.min.js"></script>
+<script>
+  const pusher = new Pusher('YOUR_APP_KEY', { cluster: 'hkg', wsHost: 'ws.hibira.io', forceTLS: true, enabledTransports: ['ws', 'wss'] });
+  pusher.subscribe('releases').bind('new-item', (item) => {
+    const li = document.createElement('li');
+    const a = document.createElement('a');
+    a.href = item.link;
+    a.textContent = `${item.feed.title}: ${item.title}`;
+    li.append(a);
+    document.getElementById('items').prepend(li);
+  });
+</script>

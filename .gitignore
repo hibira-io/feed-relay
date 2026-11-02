@@ -1,0 +1,5 @@
+/feed-relay
+/dist
+*.state.json
+feed-relay-state.json
+.env

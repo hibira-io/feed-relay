@@ -1,0 +1,23 @@
+# RSSHub and feed-relay side by side: RSSHub turns sites into feeds,
+# feed-relay sends every new item to Hibira.
+services:
+  rsshub:
+    image: diygod/rsshub:latest
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      CACHE_TYPE: memory
+
+  feed-relay:
+    image: ghcr.io/hibira-io/feed-relay:latest
+    restart: unless-stopped
+    depends_on: [rsshub]
+    env_file: .env          # HIBIRA_APP_ID, HIBIRA_APP_KEY, HIBIRA_APP_SECRET
+    volumes:
+      - ./feed-relay.yaml:/config/feed-relay.yaml:ro
+      - relay-data:/data
+    ports:
+      - "8080:8080"         # /healthz, and WebSub callbacks if public_url is set
+
+volumes:
+  relay-data:
