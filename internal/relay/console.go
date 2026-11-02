@@ -341,12 +341,13 @@ func (r *Relay) apiDiscover(w http.ResponseWriter, req *http.Request) {
 
 func (r *Relay) apiRoutes(w http.ResponseWriter, req *http.Request) {
 	q := req.URL.Query()
-	routes, err := r.SearchRoutes(req.Context(), q.Get("q"), q.Get("lang"), 40)
+	offset, _ := strconv.Atoi(q.Get("offset"))
+	page, err := r.SearchRoutes(req.Context(), q.Get("q"), q.Get("lang"), offset, 30)
 	if errors.Is(err, ErrNoRSSHub) {
 		writeJSON(w, http.StatusConflict, map[string]string{"error": "Set rsshub_url to browse RSSHub routes."})
 		return
 	}
-	answer(w, http.StatusOK, map[string]any{"routes": routes}, err)
+	answer(w, http.StatusOK, page, err)
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

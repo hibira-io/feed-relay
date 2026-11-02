@@ -124,8 +124,9 @@ func TestDiscoverAndRoutes(t *testing.T) {
 		t.Fatalf("radar www: %+v", found)
 	}
 
-	routes, err := r.SearchRoutes(ctx, "github", "en", 10)
-	if err != nil || len(routes) != 3 {
+	page, err := r.SearchRoutes(ctx, "github", "en", 0, 10)
+	routes := page.Routes
+	if err != nil || len(routes) != 3 || page.Total != 3 {
 		t.Fatalf("search: %v %+v", err, routes)
 	}
 	if routes[len(routes)-1].Path != "/github/notifications" || !routes[len(routes)-1].NeedsConfig {
@@ -146,13 +147,19 @@ func TestDiscoverAndRoutes(t *testing.T) {
 	if len(repos.Params) != 2 || !repos.Params[1].Optional || len(repos.Params[1].Options) != 2 {
 		t.Fatalf("optional params: %+v", repos.Params)
 	}
-	if routes, _ = r.SearchRoutes(ctx, "", "en", 10); len(routes) != 3 || routes[0].Namespace != "github" {
-		t.Fatalf("popular: %+v", routes)
+	if page, _ = r.SearchRoutes(ctx, "github", "en", 2, 10); len(page.Routes) != 1 || page.Total != 3 || page.Routes[0].Path != "/github/notifications" {
+		t.Fatalf("second page: %+v", page)
 	}
-	if routes, _ = r.SearchRoutes(ctx, "release", "zh-CN", 10); len(routes) != 1 || routes[0].Name != "仓库 Releases" || routes[0].Site != "GitHub 中文" {
+	if page, _ = r.SearchRoutes(ctx, "github", "en", 9, 10); len(page.Routes) != 0 {
+		t.Fatalf("past the end: %+v", page)
+	}
+	if page, _ = r.SearchRoutes(ctx, "", "en", 0, 10); len(page.Routes) != 3 || page.Routes[0].Namespace != "github" {
+		t.Fatalf("popular: %+v", page)
+	}
+	if routes = must(r.SearchRoutes(ctx, "release", "zh-CN", 0, 10)).Routes; len(routes) != 1 || routes[0].Name != "仓库 Releases" || routes[0].Site != "GitHub 中文" {
 		t.Fatalf("zh: %+v", routes)
 	}
-	if routes, _ = r.SearchRoutes(ctx, "nope", "en", 10); len(routes) != 0 {
+	if routes = must(r.SearchRoutes(ctx, "nope", "en", 0, 10)).Routes; len(routes) != 0 {
 		t.Fatalf("nsfw routes are left out: %+v", routes)
 	}
 	if namespaceHits != 1 {
@@ -160,7 +167,7 @@ func TestDiscoverAndRoutes(t *testing.T) {
 	}
 
 	r2 := New(&Config{Defaults: FeedDefaults{UserAgent: "test"}}, &Store{}, r.log)
-	if _, err := r2.SearchRoutes(ctx, "x", "en", 10); err != ErrNoRSSHub {
+	if _, err := r2.SearchRoutes(ctx, "x", "en", 0, 10); err != ErrNoRSSHub {
 		t.Fatalf("without rsshub_url: %v", err)
 	}
 }
@@ -185,4 +192,11 @@ func TestBlockPrivateURLs(t *testing.T) {
 	if privateAddr(netip.MustParseAddr("140.82.112.3")) {
 		t.Error("a public address was refused")
 	}
+}
+
+func must[T any](v T, err error) T {
+	if err != nil {
+		panic(err)
+	}
+	return v
 }

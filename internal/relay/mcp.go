@@ -44,7 +44,9 @@ type feedRef struct {
 }
 
 type feedList struct {
-	Feeds []FeedInfo `json:"feeds"`
+	Feeds  []FeedInfo `json:"feeds"`
+	Total  int        `json:"total"`
+	Offset int        `json:"offset"`
 }
 
 type updateInput struct {
@@ -68,13 +70,17 @@ type findInput struct {
 }
 
 type routeSearch struct {
-	Query string `json:"query,omitempty" jsonschema:"site, namespace or words, such as github release or youtube channel; empty lists popular routes"`
-	Lang  string `json:"lang,omitempty" jsonschema:"language for route names: en, ja, zh-CN or zh-TW"`
-	Limit int    `json:"limit,omitempty" jsonschema:"routes to return, default 20, at most 100"`
+	Query  string `json:"query,omitempty" jsonschema:"site, namespace or words, such as github release or youtube channel; empty lists popular routes"`
+	Lang   string `json:"lang,omitempty" jsonschema:"language for route names: en, ja, zh-CN or zh-TW"`
+	Offset int    `json:"offset,omitempty" jsonschema:"skip this many results, for the next page"`
+	Limit  int    `json:"limit,omitempty" jsonschema:"routes to return, default 20, at most 100"`
 }
 
-type routeList struct {
-	Routes []RouteInfo `json:"routes"`
+type listInput struct {
+	Query  string `json:"query,omitempty" jsonschema:"only feeds whose name, URL, channel or event contains these words"`
+	Status string `json:"status,omitempty" jsonschema:"only feeds that are running, paused or failing"`
+	Offset int    `json:"offset,omitempty" jsonschema:"skip this many feeds, for the next page"`
+	Limit  int    `json:"limit,omitempty" jsonschema:"feeds to return, default 50, at most 200"`
 }
 
 type checkResult struct {
@@ -101,9 +107,14 @@ func (r *Relay) mcpServer() *mcp.Server {
 	yes, no := true, false
 	readOnly := &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: &no}
 
-	mcp.AddTool(s, &mcp.Tool{Name: "list_feeds", Description: "List every feed with its targets and status: last check, items sent, last error, WebSub state.", Annotations: readOnly},
-		func(context.Context, *mcp.CallToolRequest, struct{}) (*mcp.CallToolResult, any, error) {
-			return nil, feedList{Feeds: r.FeedInfos()}, nil
+	mcp.AddTool(s, &mcp.Tool{Name: "list_feeds", Description: "List feeds with their targets and status (last check, items sent, last error, WebSub state), optionally filtered by words or status. total is the number of matches; page with offset.", Annotations: readOnly},
+		func(_ context.Context, _ *mcp.CallToolRequest, in listInput) (*mcp.CallToolResult, any, error) {
+			limit := in.Limit
+			if limit <= 0 {
+				limit = 50
+			}
+			feeds, total := r.FilterFeeds(in.Query, in.Status, in.Offset, min(limit, 200))
+			return nil, feedList{Feeds: feeds, Total: total, Offset: max(in.Offset, 0)}, nil
 		})
 	mcp.AddTool(s, &mcp.Tool{Name: "get_feed", Description: "Get one feed and its status.", Annotations: readOnly},
 		func(_ context.Context, _ *mcp.CallToolRequest, in feedRef) (*mcp.CallToolResult, any, error) {
@@ -130,11 +141,7 @@ func (r *Relay) mcpServer() *mcp.Server {
 			if limit <= 0 {
 				limit = 20
 			}
-			routes, err := r.SearchRoutes(ctx, in.Query, in.Lang, limit)
-			if err != nil {
-				return nil, nil, err
-			}
-			return nil, routeList{Routes: routes}, nil
+			return result(r.SearchRoutes(ctx, in.Query, in.Lang, in.Offset, min(limit, 100)))
 		})
 	mcp.AddTool(s, &mcp.Tool{Name: "add_feed", Description: "Add a feed and start watching it. Needs channels, push or inbox as a target.",
 		Annotations: &mcp.ToolAnnotations{OpenWorldHint: &yes, DestructiveHint: &no}},

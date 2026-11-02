@@ -20,6 +20,7 @@
     search: '<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>',
     book: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/>',
     chevron: '<path d="m9 18 6-6-6-6"/>',
+    chevronLeft: '<path d="m15 18-6-6 6-6"/>',
   };
   const icon = (name) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[name]}</svg>`;
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -229,10 +230,24 @@
           <div class="stats" id="stats"></div>
           <button class="btn primary" id="add">${icon('plus')}${esc(t('addFeed'))}</button>
         </div>
+        <div class="tools" id="tools">
+          <label class="search">${icon('search')}<input id="q" type="text" enterkeyhint="search" placeholder="${esc(t('searchFeeds'))}" aria-label="${esc(t('searchFeeds'))}" value="${esc(view.q)}" autocomplete="off" spellcheck="false"></label>
+          <div class="seg" role="radiogroup" id="status-filter"></div>
+        </div>
         <div class="list" id="list"></div>
+        <nav class="pager" id="pager" aria-label="${esc(t('pages'))}"></nav>
       </div>`;
     $('#logout').onclick = async () => { await api('POST', '/api/logout'); stopLive(); showLogin(); };
     $('#add').onclick = () => openEditor(null);
+    $('#q').oninput = (e) => { view.q = e.target.value; view.page = 0; renderList(); };
+    $('#q').onkeydown = (e) => { if (e.key === 'Escape' && e.target.value) { e.target.value = ''; view.q = ''; view.page = 0; renderList(); } };
+    $('#status-filter').onclick = (e) => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      view.status = b.dataset.v;
+      view.page = 0;
+      renderList();
+    };
     wirePrefs(app);
     renderList();
     if (live) setLive(live.status, live.reason);
@@ -259,6 +274,24 @@
     return { text: parts.join(' · '), cls: '' };
   }
 
+  // view is the feed list's search, status filter and page; it survives the
+  // periodic refresh and live updates.
+  const view = { q: '', status: 'all', page: 0 };
+  const PAGE_SIZE = 20;
+  const STATUSES = [['all', 'filterAll'], ['running', 'filterRunning'], ['paused', 'filterPaused'], ['failing', 'filterFailing']];
+  function statusMatch(v, s) {
+    const f = v.feed;
+    if (s === 'running') return !f.disabled;
+    if (s === 'paused') return f.disabled;
+    if (s === 'failing') return !f.disabled && !!v.status.last_error;
+    return true;
+  }
+  function textMatch(v, words) {
+    const f = v.feed;
+    const text = [f.name, f.url, f.event || '', ...(f.channels || [])].join(' ').toLowerCase();
+    return words.every((w) => text.includes(w));
+  }
+
   function renderList() {
     const list = $('#list');
     if (!list) return;
@@ -269,6 +302,8 @@
       <div class="stat"><b>${feeds.length}</b><span>${esc(t('statFeeds', { n: feeds.length }))}</span></div>
       <div class="stat"><b>${sent}</b><span>${esc(t('statSent'))}</span></div>
       ${errs ? `<div class="stat"><b class="err-text">${errs}</b><span>${esc(t('statFailing'))}</span></div>` : ''}`;
+    $('#tools').classList.toggle('hidden', feeds.length === 0);
+    $('#pager').innerHTML = '';
     if (!feeds.length) {
       list.innerHTML = `<div class="empty">
         <div class="empty-mark"><div class="mark">${icon('rss')}</div></div>
@@ -278,7 +313,35 @@
       $('#add2').onclick = () => openEditor(null);
       return;
     }
-    list.innerHTML = feeds.map((v) => {
+    const words = view.q.toLowerCase().split(/\s+/).filter(Boolean);
+    const byText = feeds.filter((v) => textMatch(v, words));
+    $('#status-filter').innerHTML = STATUSES.map(([key, label]) => {
+      const n = byText.filter((v) => statusMatch(v, key)).length;
+      return `<button type="button" role="radio" data-v="${key}" aria-checked="${view.status === key}">${esc(t(label))}<span class="count">${n}</span></button>`;
+    }).join('');
+    const shown = byText.filter((v) => statusMatch(v, view.status));
+    const pages = Math.max(1, Math.ceil(shown.length / PAGE_SIZE));
+    view.page = Math.min(view.page, pages - 1);
+    const from = view.page * PAGE_SIZE;
+    const page = shown.slice(from, from + PAGE_SIZE);
+    if (!shown.length) {
+      list.innerHTML = `<div class="empty small"><p>${esc(t('noMatch'))}</p>
+        <button class="btn" id="clear-filter">${icon('x')}${esc(t('clearFilter'))}</button></div>`;
+      $('#clear-filter').onclick = () => { view.q = ''; view.status = 'all'; view.page = 0; $('#q').value = ''; renderList(); $('#q').focus(); };
+      return;
+    }
+    if (pages > 1) {
+      $('#pager').innerHTML = `
+        <button class="icon-btn" data-page="-1" data-tip="${esc(t('prevPage'))}" aria-label="${esc(t('prevPage'))}" ${view.page === 0 ? 'disabled' : ''}>${icon('chevronLeft')}</button>
+        <span class="pager-text">${esc(t('pageOf', { from: from + 1, to: from + page.length, total: shown.length }))}</span>
+        <button class="icon-btn" data-page="1" data-tip="${esc(t('nextPage'))}" data-tip-end aria-label="${esc(t('nextPage'))}" ${view.page >= pages - 1 ? 'disabled' : ''}>${icon('chevron')}</button>`;
+      $('#pager').querySelectorAll('[data-page]').forEach((b) => (b.onclick = () => {
+        view.page += Number(b.dataset.page);
+        renderList();
+        $('#tools').scrollIntoView({ block: 'nearest' });
+      }));
+    }
+    list.innerHTML = page.map((v) => {
       const f = v.feed, st = statusOf(v), file = v.source === 'file';
       return `<div class="feed${f.disabled ? ' paused' : ''}" data-id="${v.id}">
         <div class="mark">${icon('rss')}</div>
@@ -733,20 +796,38 @@
       go.disabled = false;
     }
 
-    async function searchRoutes() {
-      const n = ++seq;
-      if (!routes.length) out.innerHTML = `<span class="hint">${esc(t('loadingRoutes'))}</span>`;
-      try {
-        const r = await api('GET', `/api/routes?q=${encodeURIComponent(q.value.trim())}&lang=${encodeURIComponent(lang)}`);
-        if (n !== seq) return;
-        routes = r.routes;
-        if (!routes.length) { out.innerHTML = `<span class="hint">${esc(t('noRoutes'))}</span>`; return; }
-        out.innerHTML = `<ul class="pick">${routes.map((rt, i) => `
+    const routeRow = (rt, i) => `
           <li data-i="${i}"><button type="button" class="pick-row" aria-expanded="false">
             <span class="pick-main"><span class="pick-title">${esc(rt.site)} · ${esc(rt.name)}</span><span class="pick-sub mono">${esc(rt.path)}</span></span>
             ${rt.needs_config ? `<span class="chip warn" data-tip="${esc(t('needsConfigTip'))}" data-tip-end>${esc(t('needsConfig'))}</span>` : ''}
-            <span class="pick-go">${icon('chevron')}</span></button></li>`).join('')}</ul>`;
+            <span class="pick-go">${icon('chevron')}</span></button></li>`;
+
+    // searchRoutes loads the first page of matches; more=true adds the next one.
+    async function searchRoutes(more) {
+      const n = ++seq;
+      const offset = more === true ? routes.length : 0;
+      if (!offset && !routes.length) out.innerHTML = `<span class="hint">${esc(t('loadingRoutes'))}</span>`;
+      const moreBtn = $('#routes-more', out);
+      if (moreBtn) moreBtn.disabled = true;
+      try {
+        const r = await api('GET', `/api/routes?q=${encodeURIComponent(q.value.trim())}&lang=${encodeURIComponent(lang)}&offset=${offset}`);
+        if (n !== seq) return;
+        if (!offset) {
+          routes = r.routes;
+          if (!routes.length) { out.innerHTML = `<span class="hint">${esc(t('noRoutes'))}</span>`; return; }
+          out.innerHTML = `<div class="hint count-line" id="routes-count"></div><ul class="pick">${routes.map(routeRow).join('')}</ul>`;
+        } else {
+          const ul = $('.pick', out);
+          ul.insertAdjacentHTML('beforeend', r.routes.map((rt, i) => routeRow(rt, offset + i)).join(''));
+          routes = routes.concat(r.routes);
+        }
         out.querySelectorAll('li[data-i] > .pick-row').forEach((b) => (b.onclick = () => openRoute(b.parentElement)));
+        $('#routes-count', out).textContent = t('routesShown', { shown: routes.length, total: r.total });
+        $('#routes-more', out)?.remove();
+        if (routes.length < r.total) {
+          $('.pick', out).insertAdjacentHTML('beforeend', `<li class="more-row"><button type="button" class="btn block" id="routes-more">${esc(t('loadMore', { n: Math.min(30, r.total - routes.length) }))}</button></li>`);
+          $('#routes-more', out).onclick = () => searchRoutes(true);
+        }
       } catch (err) {
         if (n === seq) out.innerHTML = `<div class="problems">${esc(err.message)}</div>`;
       }

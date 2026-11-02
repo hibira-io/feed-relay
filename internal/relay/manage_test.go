@@ -258,8 +258,17 @@ func TestMCP(t *testing.T) {
 		t.Fatalf("add without a target: %v", out)
 	}
 	out, _ = call("list_feeds", nil)
-	if len(out["feeds"].([]any)) != 2 {
+	if len(out["feeds"].([]any)) != 2 || out["total"].(float64) != 2 {
 		t.Fatalf("list: %v", out)
+	}
+	if out, _ = call("list_feeds", map[string]any{"query": "NEWS"}); out["total"].(float64) != 1 || out["feeds"].([]any)[0].(map[string]any)["feed"].(map[string]any)["name"] != "notes" {
+		t.Fatalf("list by channel: %v", out)
+	}
+	if out, _ = call("list_feeds", map[string]any{"offset": 1, "limit": 1}); len(out["feeds"].([]any)) != 1 || out["total"].(float64) != 2 {
+		t.Fatalf("list page 2: %v", out)
+	}
+	if out, _ = call("list_feeds", map[string]any{"status": "paused"}); out["total"].(float64) != 0 {
+		t.Fatalf("list paused: %v", out)
 	}
 	call("check_feed", map[string]any{"name": "notes"})
 	feed.add("C")

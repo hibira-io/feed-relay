@@ -61,6 +61,7 @@ Set `ADMIN_PASSWORD` (at least 12 characters) and open the relay's address, `htt
 - add a feed without typing its URL: **Find a feed** reads any web page and lists the feeds it offers plus the RSSHub routes that match it (paste `github.com/vercel/next.js/releases` and pick “Repo Releases”), or browses your RSSHub's routes and fills in their parameters,
 - or paste a URL or an RSSHub route yourself, **Preview** it to see the newest items and the size of each event, then pick the channels, the check interval, push and inbox,
 - edit, pause and delete feeds, **Check now**, and **Send test** to send the newest item through the whole chain,
+- search feeds by name, URL or channel, filter running, paused or failing ones, and page through them (20 a page),
 - see each feed's last check, items sent and last error.
 
 The console is in English, 日本語, 한국어, 繁體中文, 简体中文, ไทย and Tiếng Việt (it follows the browser; change it with the globe button), and has light, dark and system themes. Browsing RSSHub routes needs `rsshub_url`; it reads `/api/namespace` and `/api/radar/rules` from your RSSHub and keeps them for six hours.
@@ -79,7 +80,7 @@ claude mcp add --transport http feed-relay http://localhost:8080/mcp --header "A
 
 | Tool | |
 |---|---|
-| `list_feeds`, `get_feed` | feeds with their targets and status |
+| `list_feeds`, `get_feed` | feeds with their targets and status; `list_feeds` takes `query`, `status`, `offset` and `limit` |
 | `find_feeds` | the feeds a web page offers, and the RSSHub routes that match it |
 | `search_rsshub_routes` | search your RSSHub's routes and their parameters |
 | `preview_feed` | read a URL or RSSHub route without saving it |
