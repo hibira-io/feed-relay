@@ -120,6 +120,7 @@ Each event is kept under `max_bytes` (default 3,500, under the Free plan's 4 KB)
 | `mcp_token` | `MCP_TOKEN` | turns on the MCP server at `/mcp` |
 | `rsshub_url` | `RSSHUB_URL` | lets a feed URL be just an RSSHub route, `/github/release/owner/repo` |
 | `public_url` | `PUBLIC_URL` | a public https base URL; turns on WebSub |
+| `block_private_urls` | `BLOCK_PRIVATE_URLS` | `true` refuses feeds and pages on loopback, private, link-local and cloud-metadata addresses (checked after DNS and on redirects), except `rsshub_url`; turn it on when the console or `/mcp` is reachable from the internet. Feed requests then skip `HTTPS_PROXY`. |
 | `listen` | `:8080` | console, `/mcp`, `/healthz` and `/websub/...` |
 | `state_file` | `feed-relay-state.json` | which items were sent; keep it on a volume |
 | `feeds_file` | `feeds.json` next to `state_file` | feeds added in the console or over MCP |
@@ -157,7 +158,7 @@ Flags: `-config` (or `CONFIG`), `-once` (fetch every feed once and exit, for cro
 ## Notes
 
 - Only relay feeds you are allowed to use, and follow each source site's terms. Keep intervals reasonable.
-- The relay sends events through the app's secret, so run it on your server, never in a browser. Put the console and `/mcp` behind https when they are reachable from the internet.
+- The relay sends events through the app's secret, so run it on your server, never in a browser. Put the console and `/mcp` behind https when they are reachable from the internet. The console, `/mcp` and feeds make the relay fetch URLs; if other people can reach them, set `block_private_urls` so they cannot reach your private network through it.
 - On the Free plan, list your page's origin in the app's allowed origins.
 
 ## Development

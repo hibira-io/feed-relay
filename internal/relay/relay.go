@@ -69,7 +69,7 @@ func New(cfg *Config, store *Store, log *slog.Logger) *Relay {
 		cfg:    cfg,
 		hibira: NewHibira(cfg.Hibira, nil),
 		store:  store,
-		client: &http.Client{Timeout: 30 * time.Second},
+		client: fetchClient(cfg),
 		log:    log,
 		feeds:  map[string]*running{},
 		status: map[string]*feedStatus{},

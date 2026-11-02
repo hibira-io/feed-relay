@@ -7,7 +7,9 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"net/url"
+	"strings"
 	"testing"
 )
 
@@ -160,5 +162,27 @@ func TestDiscoverAndRoutes(t *testing.T) {
 	r2 := New(&Config{Defaults: FeedDefaults{UserAgent: "test"}}, &Store{}, r.log)
 	if _, err := r2.SearchRoutes(ctx, "x", "en", 10); err != ErrNoRSSHub {
 		t.Fatalf("without rsshub_url: %v", err)
+	}
+}
+
+func TestBlockPrivateURLs(t *testing.T) {
+	feed := newFakeFeed(t, "A")
+	hub := newFakeFeed(t, "B")
+	cfg := &Config{BlockPrivateURLs: true, RSSHubURL: hub.srv.URL, Defaults: FeedDefaults{UserAgent: "test"}}
+	r := New(cfg, &Store{}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	ctx := context.Background()
+	if _, err := r.Discover(ctx, feed.srv.URL); err == nil || !strings.Contains(err.Error(), "private network") {
+		t.Fatalf("a loopback page should be refused: %v", err)
+	}
+	if _, err := r.PreviewFeed(ctx, hub.srv.URL, nil, 1); err != nil {
+		t.Fatalf("the rsshub_url host stays allowed: %v", err)
+	}
+	for _, a := range []string{"10.0.0.1", "192.168.1.1", "169.254.169.254", "100.64.0.1", "::1", "fd00::1", "::ffff:127.0.0.1"} {
+		if !privateAddr(netip.MustParseAddr(a)) {
+			t.Errorf("%s should be private", a)
+		}
+	}
+	if privateAddr(netip.MustParseAddr("140.82.112.3")) {
+		t.Error("a public address was refused")
 	}
 }
