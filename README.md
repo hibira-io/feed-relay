@@ -44,7 +44,7 @@ RSSHub / any feed ──poll or WebSub──▶ feed-relay ──HTTP API──�
      -v relay-data:/data -p 8080:8080 ghcr.io/hibira-io/feed-relay:latest
    ```
 
-   Binaries for Linux, macOS and Windows are on the [releases page](https://github.com/hibira-io/feed-relay/releases).
+   Images are on GitHub Container Registry for `linux/amd64` and `linux/arm64`: `:latest` and `:<version>` for releases, `:main` and `:sha-<commit>` for the newest build of `main`. Binaries for Linux, macOS and Windows are on the [releases page](https://github.com/hibira-io/feed-relay/releases).
 
 4. Listen in the browser ([`examples/listen.html`](examples/listen.html)):
 
