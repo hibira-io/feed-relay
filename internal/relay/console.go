@@ -133,6 +133,8 @@ func (r *Relay) mountConsole(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/feeds/{id}/poll", r.authed(r.apiPoll))
 	mux.HandleFunc("POST /api/feeds/{id}/test", r.authed(r.apiTest))
 	mux.HandleFunc("POST /api/preview", r.authed(r.apiPreview))
+	mux.HandleFunc("POST /api/discover", r.authed(r.apiDiscover))
+	mux.HandleFunc("GET /api/routes", r.authed(r.apiRoutes))
 	mux.HandleFunc("POST /api/live/auth", r.authed(r.apiLiveAuth))
 }
 
@@ -324,6 +326,27 @@ func (r *Relay) apiPreview(w http.ResponseWriter, req *http.Request) {
 	}
 	p, err := r.PreviewFeed(req.Context(), body.URL, body.Headers, 5)
 	answer(w, http.StatusOK, p, err)
+}
+
+func (r *Relay) apiDiscover(w http.ResponseWriter, req *http.Request) {
+	var body struct {
+		URL string `json:"url"`
+	}
+	if !readJSON(w, req, &body) {
+		return
+	}
+	d, err := r.Discover(req.Context(), body.URL)
+	answer(w, http.StatusOK, d, err)
+}
+
+func (r *Relay) apiRoutes(w http.ResponseWriter, req *http.Request) {
+	q := req.URL.Query()
+	routes, err := r.SearchRoutes(req.Context(), q.Get("q"), q.Get("lang"), 40)
+	if errors.Is(err, ErrNoRSSHub) {
+		writeJSON(w, http.StatusConflict, map[string]string{"error": "Set rsshub_url to browse RSSHub routes."})
+		return
+	}
+	answer(w, http.StatusOK, map[string]any{"routes": routes}, err)
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

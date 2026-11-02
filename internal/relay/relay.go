@@ -39,6 +39,8 @@ type Relay struct {
 	liveOnce sync.Once
 	liveQ    chan string
 
+	catalog catalog // RSSHub routes and radar rules, for finding feeds
+
 	sleep func(context.Context, time.Duration) bool
 }
 
@@ -67,7 +69,7 @@ func New(cfg *Config, store *Store, log *slog.Logger) *Relay {
 		cfg:    cfg,
 		hibira: NewHibira(cfg.Hibira, nil),
 		store:  store,
-		client: &http.Client{Timeout: 30 * time.Second},
+		client: fetchClient(cfg),
 		log:    log,
 		feeds:  map[string]*running{},
 		status: map[string]*feedStatus{},

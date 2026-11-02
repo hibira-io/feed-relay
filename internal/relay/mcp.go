@@ -63,6 +63,20 @@ type previewInput struct {
 	Limit   int               `json:"limit,omitempty" jsonschema:"newest items to return, default 5, at most 20"`
 }
 
+type findInput struct {
+	URL string `json:"url" jsonschema:"a web page, such as https://github.com/vercel/next.js or a blog's home page"`
+}
+
+type routeSearch struct {
+	Query string `json:"query,omitempty" jsonschema:"site, namespace or words, such as github release or youtube channel; empty lists popular routes"`
+	Lang  string `json:"lang,omitempty" jsonschema:"language for route names: en, ja, zh-CN or zh-TW"`
+	Limit int    `json:"limit,omitempty" jsonschema:"routes to return, default 20, at most 100"`
+}
+
+type routeList struct {
+	Routes []RouteInfo `json:"routes"`
+}
+
 type checkResult struct {
 	Sent int      `json:"sent"`
 	Feed FeedInfo `json:"feed"`
@@ -81,7 +95,7 @@ type deleted struct {
 func (r *Relay) mcpServer() *mcp.Server {
 	s := mcp.NewServer(&mcp.Implementation{Name: "hibira-feed-relay", Title: "Hibira feed relay", Version: Version}, &mcp.ServerOptions{
 		Instructions: "This relay watches RSS, Atom, JSON and RSSHub feeds and sends each new item to Hibira channels, push and inbox. " +
-			"Use preview_feed to check a URL before add_feed. A new feed only remembers its current items; set backfill to also send some. " +
+			"Use find_feeds or search_rsshub_routes to find a feed, and preview_feed to check it before add_feed. A new feed only remembers its current items; set backfill to also send some. " +
 			"Feeds with source \"file\" come from the config file and cannot be changed here.",
 	})
 	yes, no := true, false
@@ -103,6 +117,24 @@ func (r *Relay) mcpServer() *mcp.Server {
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: &yes}},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in previewInput) (*mcp.CallToolResult, any, error) {
 			return result(r.PreviewFeed(ctx, in.URL, in.Headers, min(max(in.Limit, 0), 20)))
+		})
+	mcp.AddTool(s, &mcp.Tool{Name: "find_feeds", Description: "Find the feeds a web page offers: the page itself if it is a feed, the feeds it links to, and the RSSHub routes that match it (when the relay has rsshub_url). Use the url of a result as add_feed's url.",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: &yes}},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in findInput) (*mcp.CallToolResult, any, error) {
+			return result(r.Discover(ctx, in.URL))
+		})
+	mcp.AddTool(s, &mcp.Tool{Name: "search_rsshub_routes", Description: "Search the RSSHub instance's routes by site or topic. Each route lists its parameters; replace each :param in path with a value (drop optional ones you skip) and use the result as add_feed's url.",
+		Annotations: readOnly},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in routeSearch) (*mcp.CallToolResult, any, error) {
+			limit := in.Limit
+			if limit <= 0 {
+				limit = 20
+			}
+			routes, err := r.SearchRoutes(ctx, in.Query, in.Lang, limit)
+			if err != nil {
+				return nil, nil, err
+			}
+			return nil, routeList{Routes: routes}, nil
 		})
 	mcp.AddTool(s, &mcp.Tool{Name: "add_feed", Description: "Add a feed and start watching it. Needs channels, push or inbox as a target.",
 		Annotations: &mcp.ToolAnnotations{OpenWorldHint: &yes, DestructiveHint: &no}},

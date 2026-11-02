@@ -24,9 +24,13 @@ type Config struct {
 	FeedsFile     string       `yaml:"feeds_file"`     // feeds added in the web console
 	AdminPassword string       `yaml:"admin_password"` // turns on the web console at /
 	MCPToken      string       `yaml:"mcp_token"`      // turns on the MCP server at /mcp
-	RSSHubURL     string       `yaml:"rsshub_url"`     // lets a feed URL be just an RSSHub route, "/github/release/a/b"
-	Defaults      FeedDefaults `yaml:"defaults"`
-	Feeds         []Feed       `yaml:"feeds"`
+	// BlockPrivateURLs refuses feeds and pages on loopback, private,
+	// link-local and cloud-metadata addresses, except rsshub_url's host and port.
+	// For relays whose console or /mcp is reachable from the internet.
+	BlockPrivateURLs bool         `yaml:"block_private_urls"`
+	RSSHubURL        string       `yaml:"rsshub_url"` // lets a feed URL be just an RSSHub route, "/github/release/a/b"
+	Defaults         FeedDefaults `yaml:"defaults"`
+	Feeds            []Feed       `yaml:"feeds"`
 }
 
 type HibiraConfig struct {
@@ -195,6 +199,9 @@ func (c *Config) applyEnv() {
 	set(&c.AdminPassword, "ADMIN_PASSWORD")
 	set(&c.MCPToken, "MCP_TOKEN")
 	set(&c.RSSHubURL, "RSSHUB_URL")
+	if v := os.Getenv("BLOCK_PRIVATE_URLS"); v != "" && !c.BlockPrivateURLs {
+		c.BlockPrivateURLs = v == "1" || strings.EqualFold(v, "true") || strings.EqualFold(v, "yes")
+	}
 }
 
 func (c *Config) normalize() error {
