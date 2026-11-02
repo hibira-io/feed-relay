@@ -84,7 +84,7 @@ func (r *Relay) hubSecret(f *Feed) string {
 }
 
 func (r *Relay) webSubCallback(w http.ResponseWriter, req *http.Request) {
-	f := r.byHook[req.PathValue("id")]
+	f := r.feedByHook(req.PathValue("id"))
 	if f == nil || !r.cfg.webSubOn(f) {
 		http.NotFound(w, req)
 		return

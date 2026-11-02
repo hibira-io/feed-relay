@@ -12,12 +12,14 @@ services:
     image: ghcr.io/hibira-io/feed-relay:latest
     restart: unless-stopped
     depends_on: [rsshub]
-    env_file: .env          # HIBIRA_APP_ID, HIBIRA_APP_KEY, HIBIRA_APP_SECRET
+    env_file: .env          # HIBIRA_APP_ID, HIBIRA_APP_KEY, HIBIRA_APP_SECRET, ADMIN_PASSWORD, MCP_TOKEN
+    environment:
+      RSSHUB_URL: http://rsshub:1200   # feeds can then be just a route: /github/release/owner/repo
     volumes:
       - ./feed-relay.yaml:/config/feed-relay.yaml:ro
       - relay-data:/data
     ports:
-      - "8080:8080"         # /healthz, and WebSub callbacks if public_url is set
+      - "8080:8080"         # web console, /mcp, /healthz and WebSub callbacks
 
 volumes:
   relay-data:

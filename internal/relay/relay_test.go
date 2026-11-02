@@ -37,6 +37,7 @@ type fakeHibira struct {
 	t        *testing.T
 	mu       sync.Mutex
 	events   []map[string]any
+	live     []map[string]any
 	inbox    []map[string]any
 	pushes   []map[string]any
 	paths    []string
@@ -79,7 +80,11 @@ func newFakeHibira(t *testing.T) *fakeHibira {
 		}
 		switch r.URL.Path {
 		case "/apps/42/events":
-			h.events = append(h.events, m)
+			if chs, _ := m["channels"].([]any); len(chs) == 1 && chs[0] == LiveChannel {
+				h.live = append(h.live, m)
+			} else {
+				h.events = append(h.events, m)
+			}
 			w.Write([]byte(`{}`))
 		case "/apps/42/inbox/notifications":
 			h.inbox = append(h.inbox, m)
@@ -92,6 +97,33 @@ func newFakeHibira(t *testing.T) *fakeHibira {
 	}))
 	t.Cleanup(h.srv.Close)
 	return h
+}
+
+// liveEvents waits for n console updates and returns them.
+func (h *fakeHibira) liveEvents(t *testing.T, n int) []LiveEvent {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		h.mu.Lock()
+		got := len(h.live)
+		h.mu.Unlock()
+		if got >= n {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("got %d live updates, want %d", got, n)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	var out []LiveEvent
+	for _, m := range h.live {
+		var ev LiveEvent
+		_ = json.Unmarshal([]byte(m["data"].(string)), &ev)
+		out = append(out, ev)
+	}
+	return out
 }
 
 func (h *fakeHibira) count() (int, int, int) {
@@ -394,7 +426,7 @@ func TestWebSub(t *testing.T) {
 	feed.extra = `<atom:link rel="hub" href="` + hub.URL + `"/><atom:link rel="self" href="https://example.com/feed.xml"/>`
 	r := testRelay(t, h, fmt.Sprintf("  - name: blog\n    url: %s\n    channel: news\n", feed.srv.URL))
 	r.cfg.PublicURL = "https://relay.example.com"
-	f := &r.cfg.Feeds[0]
+	f := r.Feeds()[0]
 	ctx := context.Background()
 
 	if err := r.Poll(ctx, f); err != nil {

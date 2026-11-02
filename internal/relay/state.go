@@ -115,6 +115,26 @@ func (s *Store) MarkSeen(name string, ids ...string) {
 	}
 }
 
+// Rename moves a feed's state to a new name.
+func (s *Store) Rename(from, to string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if from == to || s.feeds[from] == nil {
+		return
+	}
+	s.feeds[to], s.sets[to] = s.feeds[from], s.sets[from]
+	delete(s.feeds, from)
+	delete(s.sets, from)
+}
+
+// Delete forgets a feed.
+func (s *Store) Delete(name string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.feeds, name)
+	delete(s.sets, name)
+}
+
 // Save writes the file atomically.
 func (s *Store) Save() error {
 	s.mu.Lock()

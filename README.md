@@ -6,7 +6,7 @@ Turn any RSS, Atom or JSON feed, including every [RSSHub](https://github.com/DIY
 - a **push notification** to iOS, Android and the web (Hibira Push),
 - an **inbox notification** for the [`@hibira-io/inbox`](https://github.com/hibira-io/inbox) bell.
 
-It is one small Go binary or Docker image that runs next to your RSSHub or on any server. Feeds that announce a [WebSub](https://www.w3.org/TR/websub/) hub (YouTube channels, many blogs) are pushed to the relay within seconds; the rest are polled.
+It is one small Go binary or Docker image that runs next to your RSSHub or on any server, with a **web console** to manage feeds in the browser and an **MCP server** so AI agents can manage them too. Feeds that announce a [WebSub](https://www.w3.org/TR/websub/) hub (YouTube channels, many blogs) are pushed to the relay within seconds; the rest are polled.
 
 ```
 RSSHub / any feed ──poll or WebSub──▶ feed-relay ──HTTP API──▶ Hibira ──WebSocket / push──▶ browsers, apps
@@ -54,6 +54,37 @@ RSSHub / any feed ──poll or WebSub──▶ feed-relay ──HTTP API──�
    });
    ```
 
+## Web console
+
+Set `ADMIN_PASSWORD` (at least 12 characters) and open the relay's address, `http://localhost:8080`. You can:
+
+- add a feed: paste a URL or an RSSHub route, **Preview** it to see the newest items and the size of each event, then pick the channels, the check interval, push and inbox,
+- edit, pause and delete feeds, **Check now**, and **Send test** to send the newest item through the whole chain,
+- see each feed's last check, items sent and last error.
+
+Feeds added in the console are saved in `feeds.json` next to the state file and survive restarts. Feeds from the config file are shown with a lock and stay read-only.
+
+**Live updates.** The console subscribes to the private channel `private-feed-relay` on your Hibira app. When a feed is added, changed, paused or deleted, the relay publishes it there, so every open console refreshes at once and shows a toast when an AI agent made the change over MCP. On the Free plan, add the console's origin (for example `http://localhost:8080`) to the app's **allowed origins**. Until you do, the console shows "Live off" and works without live updates.
+
+## MCP server
+
+Set `MCP_TOKEN` (at least 24 characters, `openssl rand -hex 24`) and point an MCP client at `http://<relay>:8080/mcp` (Streamable HTTP) with `Authorization: Bearer <MCP_TOKEN>`:
+
+```sh
+claude mcp add --transport http feed-relay http://localhost:8080/mcp --header "Authorization: Bearer $MCP_TOKEN"
+```
+
+| Tool | |
+|---|---|
+| `list_feeds`, `get_feed` | feeds with their targets and status |
+| `preview_feed` | read a URL or RSSHub route without saving it |
+| `add_feed`, `update_feed`, `delete_feed` | manage feeds (config file feeds are read-only) |
+| `pause_feed` | pause or resume |
+| `check_feed` | check now and send what is new |
+| `send_test_item` | send the newest item again, to test the wiring |
+
+Ask your agent something like "watch the GitHub releases of vercel/next.js and send them to the `releases` channel", and it previews the RSSHub route, then adds it.
+
 ## What a channel receives
 
 Event `new-item` (or the feed's `event`), with:
@@ -80,9 +111,13 @@ Each event is kept under `max_bytes` (default 3,500, under the Free plan's 4 KB)
 | `hibira.url` | `https://ws.hibira.io` | `http://localhost:6001` for a local Pusher-compatible server |
 | `hibira.app_id`, `key`, `secret` | `HIBIRA_APP_ID`, `HIBIRA_APP_KEY`, `HIBIRA_APP_SECRET` | required |
 | `hibira.push_instance_id`, `push_secret_key` | `HIBIRA_PUSH_INSTANCE_ID`, `HIBIRA_PUSH_SECRET_KEY` | only for `push:` |
+| `admin_password` | `ADMIN_PASSWORD` | turns on the web console at `/` |
+| `mcp_token` | `MCP_TOKEN` | turns on the MCP server at `/mcp` |
+| `rsshub_url` | `RSSHUB_URL` | lets a feed URL be just an RSSHub route, `/github/release/owner/repo` |
 | `public_url` | `PUBLIC_URL` | a public https base URL; turns on WebSub |
-| `listen` | `:8080` | `/healthz` and `/websub/...` |
+| `listen` | `:8080` | console, `/mcp`, `/healthz` and `/websub/...` |
 | `state_file` | `feed-relay-state.json` | which items were sent; keep it on a volume |
+| `feeds_file` | `feeds.json` next to `state_file` | feeds added in the console or over MCP |
 | `defaults.interval` | `5m` | at least `30s` |
 | `defaults.event` | `new-item` | |
 | `defaults.max_bytes` | `3500` | |
@@ -92,7 +127,7 @@ Per feed:
 
 | Key | |
 |---|---|
-| `url` | the feed (required) |
+| `url` | the feed (required): a URL, or an RSSHub route starting with `/` |
 | `name` | a unique name (default: the URL); used in events and the state file |
 | `channel` / `channels` | where events go (up to 100) |
 | `event` | event name |
@@ -117,7 +152,7 @@ Flags: `-config` (or `CONFIG`), `-once` (fetch every feed once and exit, for cro
 ## Notes
 
 - Only relay feeds you are allowed to use, and follow each source site's terms. Keep intervals reasonable.
-- The relay sends events through the app's secret, so run it on your server, never in a browser.
+- The relay sends events through the app's secret, so run it on your server, never in a browser. Put the console and `/mcp` behind https when they are reachable from the internet.
 - On the Free plan, list your page's origin in the app's allowed origins.
 
 ## Development
@@ -129,7 +164,7 @@ go run ./cmd/feed-relay -config examples/feed-relay.yaml
 
 ## 中文摘要
 
-`feed-relay` 把任何 RSS／Atom／JSON Feed（包含所有 RSSHub 路由）的新條目，即時轉成 Hibira 的 channel 事件、App 推播或通知收件匣。單一 Go 執行檔或 Docker 映像，跟 RSSHub 放在一起跑即可。首次啟動只記住既有條目、不會洗版；已送出的條目記在 state 檔，重啟也不會重送；支援 ETag／304 與 WebSub（設定 `public_url` 後，YouTube 等有 hub 的 feed 可秒級送達）。事件預設控制在 3,500 bytes 內，符合 Free 方案 4 KB 上限。請只轉發你有權使用的 feed，並遵守來源網站條款。
+`feed-relay` 把任何 RSS／Atom／JSON Feed（包含所有 RSSHub 路由）的新條目，即時轉成 Hibira 的 channel 事件、App 推播或通知收件匣。單一 Go 執行檔或 Docker 映像，跟 RSSHub 放在一起跑即可。設定 `ADMIN_PASSWORD` 即可在瀏覽器的 Web 主控台新增、預覽、暫停、測試 feed；設定 `MCP_TOKEN` 後，AI agent 可透過 `/mcp` 管理 feed，主控台會經由 Hibira 即時收到變更並跳出提示（Free 方案需把主控台網址加入 allowed origins）。首次啟動只記住既有條目、不會洗版；已送出的條目記在 state 檔，重啟也不會重送；支援 ETag／304 與 WebSub（設定 `public_url` 後，YouTube 等有 hub 的 feed 可秒級送達）。事件預設控制在 3,500 bytes 內，符合 Free 方案 4 KB 上限。請只轉發你有權使用的 feed，並遵守來源網站條款。
 
 ## License
 

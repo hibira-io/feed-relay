@@ -53,7 +53,11 @@ var errTooBig = errors.New("feed is larger than 10 MB")
 
 // Fetch GETs the feed, sending the validators from the last fetch.
 func Fetch(ctx context.Context, client *http.Client, f *Feed, userAgent, etag, lastModified string) (*FetchResult, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, f.URL, nil)
+	target := f.FetchURL
+	if target == "" {
+		target = f.URL
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +101,7 @@ func Fetch(ctx context.Context, client *http.Client, f *Feed, userAgent, etag, l
 		}
 	}
 	if p.Self == "" {
-		p.Self = f.URL
+		p.Self = target
 	}
 	return &FetchResult{ETag: res.Header.Get("ETag"), LastModified: res.Header.Get("Last-Modified"), Feed: p}, nil
 }

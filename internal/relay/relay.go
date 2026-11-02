@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"math/rand/v2"
 	"net/http"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -17,7 +18,8 @@ import (
 // Version is set at build time with -ldflags "-X ...relay.Version=v0.1.0".
 var Version = "dev"
 
-// Relay polls feeds and sends new items to Hibira.
+// Relay polls feeds and sends new items to Hibira. Feeds come from the
+// config file and from the web console, and can change while it runs.
 type Relay struct {
 	cfg    *Config
 	hibira *Hibira
@@ -25,13 +27,25 @@ type Relay struct {
 	client *http.Client
 	log    *slog.Logger
 
-	locks  map[string]*sync.Mutex
-	byHook map[string]*Feed // WebSub callback id → feed
+	mu      sync.Mutex
+	feeds   map[string]*running // by name
+	runCtx  context.Context     // set by Run; nil in Once mode
+	runWG   sync.WaitGroup
+	console *consoleFeeds
 
 	statusMu sync.Mutex
 	status   map[string]*feedStatus
 
+	liveOnce sync.Once
+	liveQ    chan string
+
 	sleep func(context.Context, time.Duration) bool
+}
+
+type running struct {
+	feed   *Feed
+	lock   sync.Mutex
+	cancel context.CancelFunc
 }
 
 type feedStatus struct {
@@ -43,6 +57,8 @@ type feedStatus struct {
 	WebSub    string    `json:"websub,omitempty"`
 }
 
+// New builds a relay with the config file's feeds and, when the console is
+// on, the feeds saved in feeds_file.
 func New(cfg *Config, store *Store, log *slog.Logger) *Relay {
 	if log == nil {
 		log = slog.Default()
@@ -53,25 +69,59 @@ func New(cfg *Config, store *Store, log *slog.Logger) *Relay {
 		store:  store,
 		client: &http.Client{Timeout: 30 * time.Second},
 		log:    log,
-		locks:  map[string]*sync.Mutex{},
-		byHook: map[string]*Feed{},
+		feeds:  map[string]*running{},
 		status: map[string]*feedStatus{},
 		sleep:  sleepCtx,
 	}
 	for i := range cfg.Feeds {
-		f := &cfg.Feeds[i]
-		r.locks[f.Name] = &sync.Mutex{}
-		r.byHook[hookID(f.Name)] = f
-		r.status[f.Name] = &feedStatus{Name: f.Name}
+		f := cfg.Feeds[i]
+		r.feeds[f.Name] = &running{feed: &f}
 	}
 	return r
 }
 
-// Once fetches every feed one time, for cron jobs and tests.
+// Feeds returns every feed, file feeds first, then by name.
+func (r *Relay) Feeds() []*Feed {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := make([]*Feed, 0, len(r.feeds))
+	for _, rn := range r.feeds {
+		out = append(out, rn.feed)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Source != out[j].Source {
+			return out[i].Source == "file"
+		}
+		return strings.ToLower(out[i].Name) < strings.ToLower(out[j].Name)
+	})
+	return out
+}
+
+func (r *Relay) feed(name string) *running {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.feeds[name]
+}
+
+func (r *Relay) feedByHook(id string) *Feed {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for name, rn := range r.feeds {
+		if hookID(name) == id {
+			return rn.feed
+		}
+	}
+	return nil
+}
+
+// Once fetches every enabled feed one time, for cron jobs and tests.
 func (r *Relay) Once(ctx context.Context) error {
 	var errs []error
-	for i := range r.cfg.Feeds {
-		if err := r.Poll(ctx, &r.cfg.Feeds[i]); err != nil {
+	for _, f := range r.Feeds() {
+		if f.Disabled {
+			continue
+		}
+		if err := r.Poll(ctx, f); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -79,7 +129,7 @@ func (r *Relay) Once(ctx context.Context) error {
 }
 
 // Run polls every feed on its interval until ctx ends, serving health
-// checks and WebSub callbacks on cfg.Listen.
+// checks, the console and WebSub callbacks on cfg.Listen.
 func (r *Relay) Run(ctx context.Context) error {
 	srv := &http.Server{Addr: r.cfg.Listen, Handler: r.Handler(), ReadHeaderTimeout: 10 * time.Second}
 	srvErr := make(chan error, 1)
@@ -88,27 +138,84 @@ func (r *Relay) Run(ctx context.Context) error {
 			srvErr <- err
 		}
 	}()
-	r.log.Info("feed relay started", "version", Version, "feeds", len(r.cfg.Feeds), "listen", r.cfg.Listen, "websub", r.cfg.PublicURL != "")
-
-	var wg sync.WaitGroup
-	for i := range r.cfg.Feeds {
-		f := &r.cfg.Feeds[i]
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			r.loop(ctx, f)
-		}()
+	r.mu.Lock()
+	r.runCtx = ctx
+	for _, rn := range r.feeds {
+		r.startLocked(rn)
 	}
+	n := len(r.feeds)
+	r.mu.Unlock()
+	r.log.Info("feed relay started", "version", Version, "feeds", n, "listen", r.cfg.Listen,
+		"websub", r.cfg.PublicURL != "", "console", r.cfg.AdminPassword != "")
+
 	select {
 	case <-ctx.Done():
 	case err := <-srvErr:
 		return err
 	}
-	wg.Wait()
+	r.runWG.Wait()
 	shut, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_ = srv.Shutdown(shut)
 	return r.store.Save()
+}
+
+// startLocked starts the feed's polling loop when the relay is running and
+// the feed is enabled. r.mu must be held.
+func (r *Relay) startLocked(rn *running) {
+	if r.runCtx == nil || rn.feed.Disabled || rn.cancel != nil {
+		return
+	}
+	ctx, cancel := context.WithCancel(r.runCtx)
+	rn.cancel = cancel
+	f := rn.feed
+	r.runWG.Add(1)
+	go func() {
+		defer r.runWG.Done()
+		r.loop(ctx, f)
+	}()
+}
+
+// put adds or replaces a feed (under oldName when it is renamed) and
+// restarts its loop.
+func (r *Relay) put(oldName string, f *Feed) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if old := r.feeds[oldName]; old != nil {
+		if old.cancel != nil {
+			old.cancel()
+		}
+		delete(r.feeds, oldName)
+		if oldName != f.Name {
+			r.store.Rename(oldName, f.Name)
+			r.statusMu.Lock()
+			if st := r.status[oldName]; st != nil {
+				st.Name = f.Name
+				r.status[f.Name] = st
+				delete(r.status, oldName)
+			}
+			r.statusMu.Unlock()
+		}
+	}
+	rn := &running{feed: f}
+	r.feeds[f.Name] = rn
+	r.startLocked(rn)
+}
+
+// remove stops a feed and forgets its state.
+func (r *Relay) remove(name string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if rn := r.feeds[name]; rn != nil {
+		if rn.cancel != nil {
+			rn.cancel()
+		}
+		delete(r.feeds, name)
+	}
+	r.store.Delete(name)
+	r.statusMu.Lock()
+	delete(r.status, name)
+	r.statusMu.Unlock()
 }
 
 func (r *Relay) loop(ctx context.Context, f *Feed) {
@@ -120,6 +227,9 @@ func (r *Relay) loop(ctx context.Context, f *Feed) {
 	for {
 		wait := time.Duration(f.Interval)
 		if err := r.Poll(ctx, f); err != nil {
+			if ctx.Err() != nil {
+				return
+			}
 			failures++
 			// back off on a failing feed, up to 6× the interval
 			wait = min(wait*time.Duration(1<<min(failures, 3)), 6*time.Duration(f.Interval))
@@ -167,9 +277,12 @@ func (r *Relay) Poll(ctx context.Context, f *Feed) error {
 
 // process sends the new items of p, oldest first.
 func (r *Relay) process(ctx context.Context, f *Feed, p *Parsed) error {
-	lock := r.locks[f.Name]
-	lock.Lock()
-	defer lock.Unlock()
+	rn := r.feed(f.Name)
+	if rn == nil || rn.feed != f {
+		return nil // removed or replaced while this fetch was running
+	}
+	rn.lock.Lock()
+	defer rn.lock.Unlock()
 
 	var fresh []Item
 	for _, it := range p.Items {
@@ -317,27 +430,46 @@ func (r *Relay) retry(ctx context.Context, fn func() error) error {
 	return err
 }
 
-// Handler serves /healthz and the WebSub callbacks.
+// Handler serves /healthz, the WebSub callbacks and, with an admin
+// password, the web console.
 func (r *Relay) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
-		r.statusMu.Lock()
-		feeds := make([]feedStatus, 0, len(r.cfg.Feeds))
-		for _, f := range r.cfg.Feeds {
-			feeds = append(feeds, *r.status[f.Name])
+		feeds := make([]feedStatus, 0)
+		for _, f := range r.Feeds() {
+			feeds = append(feeds, r.statusOf(f.Name))
 		}
-		r.statusMu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{"version": Version, "feeds": feeds})
 	})
 	mux.HandleFunc("/websub/{id}", r.webSubCallback)
+	if r.cfg.AdminPassword != "" {
+		r.mountConsole(mux)
+	}
+	if r.cfg.MCPToken != "" {
+		mux.Handle("/mcp", r.mcpHandler())
+	}
 	return mux
 }
 
 func (r *Relay) setStatus(name string, fn func(*feedStatus)) {
 	r.statusMu.Lock()
 	defer r.statusMu.Unlock()
-	fn(r.status[name])
+	st := r.status[name]
+	if st == nil {
+		st = &feedStatus{Name: name}
+		r.status[name] = st
+	}
+	fn(st)
+}
+
+func (r *Relay) statusOf(name string) feedStatus {
+	r.statusMu.Lock()
+	defer r.statusMu.Unlock()
+	if st := r.status[name]; st != nil {
+		return *st
+	}
+	return feedStatus{Name: name}
 }
 
 func ids(items []Item) []string {

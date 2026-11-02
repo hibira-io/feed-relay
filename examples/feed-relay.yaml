@@ -8,10 +8,17 @@ hibira:
   # push_instance_id: ${HIBIRA_PUSH_INSTANCE_ID}
   # push_secret_key: ${HIBIRA_PUSH_SECRET_KEY}
 
+# Web console at / (add, edit, pause and test feeds in the browser).
+admin_password: ${ADMIN_PASSWORD}
+# MCP server at /mcp for AI agents (Authorization: Bearer <token>).
+mcp_token: ${MCP_TOKEN}
+# Your RSSHub: feed URLs can then be just a route.
+rsshub_url: ${RSSHUB_URL}
+
 # Set a public https URL to get WebSub pushes (seconds instead of polling).
 # public_url: https://relay.example.com
 listen: ":8080"
-state_file: /data/state.json
+state_file: /data/state.json   # feeds added in the console or over MCP go to /data/feeds.json
 
 defaults:
   interval: 5m        # at least 30s; be polite to the sites you read
@@ -20,7 +27,7 @@ defaults:
 feeds:
   # Any RSSHub route, from your own RSSHub (see docker-compose.yml)
   - name: pusher-server releases
-    url: http://rsshub:1200/github/release/hibira-io/pusher-server
+    url: /github/release/hibira-io/pusher-server   # an RSSHub route
     channel: releases
 
   # Any RSS, Atom or JSON Feed

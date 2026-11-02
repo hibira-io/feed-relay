@@ -51,6 +51,10 @@ func main() {
 	defer stop()
 
 	r := relay.New(cfg, store, log)
+	if err := r.LoadConsoleFeeds(); err != nil {
+		fmt.Fprintf(os.Stderr, "feed-relay: %v\n", err)
+		os.Exit(1)
+	}
 	if *once {
 		err = r.Once(ctx)
 	} else {
