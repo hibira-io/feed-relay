@@ -39,6 +39,8 @@ type Relay struct {
 	liveOnce sync.Once
 	liveQ    chan string
 
+	catalog catalog // RSSHub routes and radar rules, for finding feeds
+
 	sleep func(context.Context, time.Duration) bool
 }
 

@@ -219,7 +219,7 @@ func TestMCP(t *testing.T) {
 	for _, tool := range tools.Tools {
 		names = append(names, tool.Name)
 	}
-	if len(names) != 9 {
+	if len(names) != 11 {
 		t.Fatalf("tools: %v", names)
 	}
 
