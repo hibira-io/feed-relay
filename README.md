@@ -44,7 +44,7 @@ RSSHub / any feed ──poll or WebSub──▶ feed-relay ──HTTP API──�
      -v relay-data:/data -p 8080:8080 ghcr.io/hibira-io/feed-relay:latest
    ```
 
-   Images are on GitHub Container Registry for `linux/amd64` and `linux/arm64`: `:latest` and `:<version>` for releases, `:main` and `:sha-<commit>` for the newest build of `main`. Binaries for Linux, macOS and Windows are on the [releases page](https://github.com/hibira-io/feed-relay/releases).
+   Images are on GitHub Container Registry for `linux/amd64` and `linux/arm64`, published only from tagged releases: `:<version>` and `:latest`. Binaries for Linux, macOS and Windows are on the [releases page](https://github.com/hibira-io/feed-relay/releases).
 
 4. Listen in the browser ([`examples/listen.html`](examples/listen.html)):
 
@@ -58,9 +58,12 @@ RSSHub / any feed ──poll or WebSub──▶ feed-relay ──HTTP API──�
 
 Set `ADMIN_PASSWORD` (at least 12 characters) and open the relay's address, `http://localhost:8080`. You can:
 
-- add a feed: paste a URL or an RSSHub route, **Preview** it to see the newest items and the size of each event, then pick the channels, the check interval, push and inbox,
+- add a feed without typing its URL: **Find a feed** reads any web page and lists the feeds it offers plus the RSSHub routes that match it (paste `github.com/vercel/next.js/releases` and pick “Repo Releases”), or browses your RSSHub's routes and fills in their parameters,
+- or paste a URL or an RSSHub route yourself, **Preview** it to see the newest items and the size of each event, then pick the channels, the check interval, push and inbox,
 - edit, pause and delete feeds, **Check now**, and **Send test** to send the newest item through the whole chain,
 - see each feed's last check, items sent and last error.
+
+The console is in English, 日本語, 한국어, 繁體中文, 简体中文, ไทย and Tiếng Việt (it follows the browser; change it with the globe button), and has light, dark and system themes. Browsing RSSHub routes needs `rsshub_url`; it reads `/api/namespace` and `/api/radar/rules` from your RSSHub and keeps them for six hours.
 
 Feeds added in the console are saved in `feeds.json` next to the state file and survive restarts. Feeds from the config file are shown with a lock and stay read-only.
 
@@ -77,13 +80,15 @@ claude mcp add --transport http feed-relay http://localhost:8080/mcp --header "A
 | Tool | |
 |---|---|
 | `list_feeds`, `get_feed` | feeds with their targets and status |
+| `find_feeds` | the feeds a web page offers, and the RSSHub routes that match it |
+| `search_rsshub_routes` | search your RSSHub's routes and their parameters |
 | `preview_feed` | read a URL or RSSHub route without saving it |
 | `add_feed`, `update_feed`, `delete_feed` | manage feeds (config file feeds are read-only) |
 | `pause_feed` | pause or resume |
 | `check_feed` | check now and send what is new |
 | `send_test_item` | send the newest item again, to test the wiring |
 
-Ask your agent something like "watch the GitHub releases of vercel/next.js and send them to the `releases` channel", and it previews the RSSHub route, then adds it.
+Ask your agent something like "watch the GitHub releases of vercel/next.js and send them to the `releases` channel", and it finds the RSSHub route, previews it, then adds it.
 
 ## What a channel receives
 
@@ -164,7 +169,7 @@ go run ./cmd/feed-relay -config examples/feed-relay.yaml
 
 ## 中文摘要
 
-`feed-relay` 把任何 RSS／Atom／JSON Feed（包含所有 RSSHub 路由）的新條目，即時轉成 Hibira 的 channel 事件、App 推播或通知收件匣。單一 Go 執行檔或 Docker 映像，跟 RSSHub 放在一起跑即可。設定 `ADMIN_PASSWORD` 即可在瀏覽器的 Web 主控台新增、預覽、暫停、測試 feed；設定 `MCP_TOKEN` 後，AI agent 可透過 `/mcp` 管理 feed，主控台會經由 Hibira 即時收到變更並跳出提示（Free 方案需把主控台網址加入 allowed origins）。首次啟動只記住既有條目、不會洗版；已送出的條目記在 state 檔，重啟也不會重送；支援 ETag／304 與 WebSub（設定 `public_url` 後，YouTube 等有 hub 的 feed 可秒級送達）。事件預設控制在 3,500 bytes 內，符合 Free 方案 4 KB 上限。請只轉發你有權使用的 feed，並遵守來源網站條款。
+`feed-relay` 把任何 RSS／Atom／JSON Feed（包含所有 RSSHub 路由）的新條目，即時轉成 Hibira 的 channel 事件、App 推播或通知收件匣。單一 Go 執行檔或 Docker 映像，跟 RSSHub 放在一起跑即可。設定 `ADMIN_PASSWORD` 即可在瀏覽器的 Web 主控台新增、預覽、暫停、測試 feed，不必手打網址：貼上任何網頁即可列出它提供的 feed 與對應的 RSSHub 路由，也能直接瀏覽 RSSHub 路由並填入參數（主控台支援七種語言與深色模式）；設定 `MCP_TOKEN` 後，AI agent 可透過 `/mcp` 管理 feed，主控台會經由 Hibira 即時收到變更並跳出提示（Free 方案需把主控台網址加入 allowed origins）。首次啟動只記住既有條目、不會洗版；已送出的條目記在 state 檔，重啟也不會重送；支援 ETag／304 與 WebSub（設定 `public_url` 後，YouTube 等有 hub 的 feed 可秒級送達）。事件預設控制在 3,500 bytes 內，符合 Free 方案 4 KB 上限。請只轉發你有權使用的 feed，並遵守來源網站條款。
 
 ## License
 

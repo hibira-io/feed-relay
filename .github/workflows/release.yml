@@ -52,4 +52,4 @@ jobs:
           labels: org.opencontainers.image.source=https://github.com/hibira-io/feed-relay
           tags: |
             ghcr.io/hibira-io/feed-relay:${{ steps.v.outputs.version }}
-            ghcr.io/hibira-io/feed-relay:latest
+            ${{ !github.event.release.prerelease && 'ghcr.io/hibira-io/feed-relay:latest' || '' }}
