@@ -657,3 +657,107 @@ window.FEED_RELAY_I18N = {
     routesShown: '{shown} trên {total} route', loadMore: 'Hiện thêm {n}',
   });
 })();
+
+// Export and import.
+(() => {
+  const d = window.FEED_RELAY_I18N.dict;
+  Object.assign(d.en, {
+    exportFeeds: 'Export feeds', importFeeds: 'Import feeds',
+    exportJson: 'Backup (JSON)', exportJsonHint: 'Every setting, to restore on any relay. Includes request headers, such as RSSHub keys.',
+    exportOpml: 'OPML', exportOpmlHint: 'Names and URLs, for a feed reader.',
+    importText: 'A feed-relay backup or an OPML file from a feed reader. Feeds already here are skipped, and new ones start with their current items, so nothing old is sent.',
+    chooseFile: 'Choose a file', dropHint: 'or drop it here (.json or .opml)',
+    reading: 'Reading the file…', notImportable: 'This is not a feed-relay backup or an OPML file.', fileTooBig: 'That file is over 5 MB.',
+    importChannels: 'Channels for feeds without one', importChannelsHint: 'OPML has no channels, so every feed from it goes here.',
+    importNew: 'New', importExists: 'Name taken', importSameUrl: 'Same URL as “{name}”', importInvalid: 'Has problems',
+    importSummary: '{add} to add · {skip} skipped',
+    importN: 'Import {n} feeds', importN_one: 'Import 1 feed',
+    importedN: 'Imported {n} feeds', importedN_one: 'Imported 1 feed',
+    mcpImported: 'AI agent imported {n} feeds over MCP', mcpImported_one: 'AI agent imported 1 feed over MCP',
+    orImport: 'Or import a backup or OPML file',
+  });
+  Object.assign(d.ja, {
+    exportFeeds: 'フィードをエクスポート', importFeeds: 'フィードをインポート',
+    exportJson: 'バックアップ（JSON）', exportJsonHint: 'すべての設定を含み、どのリレーにも復元できます。RSSHub のキーなどリクエストヘッダーも含みます。',
+    exportOpml: 'OPML', exportOpmlHint: '名前と URL のみ。フィードリーダー向け。',
+    importText: 'feed-relay のバックアップ、またはフィードリーダーの OPML ファイル。既にあるフィードはスキップし、新しいフィードは現在の記事を記憶して始まるので、古い記事は送信されません。',
+    chooseFile: 'ファイルを選択', dropHint: 'またはここにドロップ（.json / .opml）',
+    reading: 'ファイルを読み込み中…', notImportable: 'feed-relay のバックアップでも OPML ファイルでもありません。', fileTooBig: 'ファイルが 5 MB を超えています。',
+    importChannels: 'チャンネルのないフィードのチャンネル', importChannelsHint: 'OPML にはチャンネルがないため、すべてのフィードがここに届きます。',
+    importNew: '新規', importExists: '同名あり', importSameUrl: '「{name}」と同じ URL', importInvalid: '問題あり',
+    importSummary: '追加 {add} 件 · スキップ {skip} 件',
+    importN: '{n} 件のフィードをインポート', importedN: '{n} 件のフィードをインポートしました',
+    mcpImported: 'AI エージェントが MCP で {n} 件のフィードをインポートしました',
+    orImport: 'またはバックアップや OPML ファイルをインポート',
+  });
+  Object.assign(d.ko, {
+    exportFeeds: '피드 내보내기', importFeeds: '피드 가져오기',
+    exportJson: '백업 (JSON)', exportJsonHint: '모든 설정을 담아 어떤 릴레이에서든 복원할 수 있습니다. RSSHub 키 같은 요청 헤더도 포함됩니다.',
+    exportOpml: 'OPML', exportOpmlHint: '이름과 URL만, 피드 리더용.',
+    importText: 'feed-relay 백업 또는 피드 리더의 OPML 파일. 이미 있는 피드는 건너뛰고, 새 피드는 현재 항목을 기억한 채 시작하므로 오래된 항목은 보내지 않습니다.',
+    chooseFile: '파일 선택', dropHint: '또는 여기에 놓기 (.json 또는 .opml)',
+    reading: '파일을 읽는 중…', notImportable: 'feed-relay 백업이나 OPML 파일이 아닙니다.', fileTooBig: '파일이 5 MB를 넘습니다.',
+    importChannels: '채널이 없는 피드의 채널', importChannelsHint: 'OPML에는 채널이 없어 모든 피드가 여기로 갑니다.',
+    importNew: '새 피드', importExists: '이름 중복', importSameUrl: '“{name}”과(와) 같은 URL', importInvalid: '문제 있음',
+    importSummary: '추가 {add}개 · 건너뜀 {skip}개',
+    importN: '피드 {n}개 가져오기', importedN: '피드 {n}개를 가져왔습니다',
+    mcpImported: 'AI 에이전트가 MCP로 피드 {n}개를 가져왔습니다',
+    orImport: '또는 백업이나 OPML 파일 가져오기',
+  });
+  Object.assign(d['zh-TW'], {
+    exportFeeds: '匯出 Feed', importFeeds: '匯入 Feed',
+    exportJson: '備份（JSON）', exportJsonHint: '包含所有設定，可在任何 relay 還原。也包含請求標頭，例如 RSSHub 金鑰。',
+    exportOpml: 'OPML', exportOpmlHint: '只有名稱和網址，給 Feed 閱讀器使用。',
+    importText: 'feed-relay 備份，或 Feed 閱讀器的 OPML 檔案。已存在的 Feed 會略過，新的 Feed 會先記住目前的項目，所以不會送出舊內容。',
+    chooseFile: '選擇檔案', dropHint: '或拖放到這裡（.json 或 .opml）',
+    reading: '正在讀取檔案…', notImportable: '這不是 feed-relay 備份，也不是 OPML 檔案。', fileTooBig: '檔案超過 5 MB。',
+    importChannels: '沒有頻道的 Feed 使用的頻道', importChannelsHint: 'OPML 沒有頻道，所以其中每個 Feed 都會送到這裡。',
+    importNew: '新增', importExists: '名稱已存在', importSameUrl: '與「{name}」網址相同', importInvalid: '有問題',
+    importSummary: '新增 {add} 個 · 略過 {skip} 個',
+    importN: '匯入 {n} 個 Feed', importedN: '已匯入 {n} 個 Feed',
+    mcpImported: 'AI 代理透過 MCP 匯入了 {n} 個 Feed',
+    orImport: '或匯入備份、OPML 檔案',
+  });
+  Object.assign(d['zh-CN'], {
+    exportFeeds: '导出 Feed', importFeeds: '导入 Feed',
+    exportJson: '备份（JSON）', exportJsonHint: '包含所有设置，可在任何 relay 上恢复。也包含请求头，例如 RSSHub 密钥。',
+    exportOpml: 'OPML', exportOpmlHint: '只有名称和地址，供 Feed 阅读器使用。',
+    importText: 'feed-relay 备份，或 Feed 阅读器的 OPML 文件。已存在的 Feed 会跳过，新的 Feed 会先记住当前条目，所以不会发送旧内容。',
+    chooseFile: '选择文件', dropHint: '或拖放到这里（.json 或 .opml）',
+    reading: '正在读取文件…', notImportable: '这不是 feed-relay 备份，也不是 OPML 文件。', fileTooBig: '文件超过 5 MB。',
+    importChannels: '没有频道的 Feed 使用的频道', importChannelsHint: 'OPML 没有频道，所以其中每个 Feed 都会发到这里。',
+    importNew: '新增', importExists: '名称已存在', importSameUrl: '与“{name}”地址相同', importInvalid: '有问题',
+    importSummary: '新增 {add} 个 · 跳过 {skip} 个',
+    importN: '导入 {n} 个 Feed', importedN: '已导入 {n} 个 Feed',
+    mcpImported: 'AI 代理通过 MCP 导入了 {n} 个 Feed',
+    orImport: '或导入备份、OPML 文件',
+  });
+  Object.assign(d.th, {
+    exportFeeds: 'ส่งออกฟีด', importFeeds: 'นำเข้าฟีด',
+    exportJson: 'สำรองข้อมูล (JSON)', exportJsonHint: 'ทุกการตั้งค่า กู้คืนบน relay ใดก็ได้ รวมเฮดเดอร์คำขอ เช่น คีย์ RSSHub',
+    exportOpml: 'OPML', exportOpmlHint: 'เฉพาะชื่อและ URL สำหรับโปรแกรมอ่านฟีด',
+    importText: 'ไฟล์สำรองของ feed-relay หรือไฟล์ OPML จากโปรแกรมอ่านฟีด ฟีดที่มีอยู่แล้วจะถูกข้าม และฟีดใหม่จะจำรายการปัจจุบันไว้ก่อน จึงไม่ส่งของเก่า',
+    chooseFile: 'เลือกไฟล์', dropHint: 'หรือวางไฟล์ที่นี่ (.json หรือ .opml)',
+    reading: 'กำลังอ่านไฟล์…', notImportable: 'ไฟล์นี้ไม่ใช่ไฟล์สำรองของ feed-relay หรือไฟล์ OPML', fileTooBig: 'ไฟล์ใหญ่เกิน 5 MB',
+    importChannels: 'ช่องสำหรับฟีดที่ไม่มีช่อง', importChannelsHint: 'OPML ไม่มีช่อง ทุกฟีดจากไฟล์จึงส่งมาที่นี่',
+    importNew: 'ใหม่', importExists: 'ชื่อซ้ำ', importSameUrl: 'URL เดียวกับ “{name}”', importInvalid: 'มีปัญหา',
+    importSummary: 'เพิ่ม {add} · ข้าม {skip}',
+    importN: 'นำเข้า {n} ฟีด', importedN: 'นำเข้าแล้ว {n} ฟีด',
+    mcpImported: 'เอเจนต์ AI นำเข้า {n} ฟีดผ่าน MCP',
+    orImport: 'หรือนำเข้าไฟล์สำรองหรือ OPML',
+  });
+  Object.assign(d.vi, {
+    exportFeeds: 'Xuất feed', importFeeds: 'Nhập feed',
+    exportJson: 'Bản sao lưu (JSON)', exportJsonHint: 'Mọi cài đặt, khôi phục được trên bất kỳ relay nào. Gồm cả header yêu cầu, như khoá RSSHub.',
+    exportOpml: 'OPML', exportOpmlHint: 'Chỉ tên và URL, cho trình đọc feed.',
+    importText: 'Bản sao lưu feed-relay hoặc tệp OPML từ trình đọc feed. Feed đã có sẽ được bỏ qua, feed mới bắt đầu bằng cách ghi nhớ các mục hiện có nên không gửi nội dung cũ.',
+    chooseFile: 'Chọn tệp', dropHint: 'hoặc thả vào đây (.json hoặc .opml)',
+    reading: 'Đang đọc tệp…', notImportable: 'Đây không phải bản sao lưu feed-relay hay tệp OPML.', fileTooBig: 'Tệp lớn hơn 5 MB.',
+    importChannels: 'Kênh cho feed chưa có kênh', importChannelsHint: 'OPML không có kênh, nên mọi feed trong đó đều gửi tới đây.',
+    importNew: 'Mới', importExists: 'Trùng tên', importSameUrl: 'Cùng URL với “{name}”', importInvalid: 'Có lỗi',
+    importSummary: 'Thêm {add} · bỏ qua {skip}',
+    importN: 'Nhập {n} feed', importedN: 'Đã nhập {n} feed',
+    mcpImported: 'Tác tử AI đã nhập {n} feed qua MCP',
+    orImport: 'Hoặc nhập bản sao lưu hay tệp OPML',
+  });
+})();

@@ -136,6 +136,8 @@ func (r *Relay) mountConsole(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/discover", r.authed(r.apiDiscover))
 	mux.HandleFunc("GET /api/routes", r.authed(r.apiRoutes))
 	mux.HandleFunc("POST /api/live/auth", r.authed(r.apiLiveAuth))
+	mux.HandleFunc("GET /api/export", r.authed(r.apiExport))
+	mux.HandleFunc("POST /api/import", r.authed(r.apiImport))
 }
 
 // --- sessions ---
@@ -348,6 +350,55 @@ func (r *Relay) apiRoutes(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	answer(w, http.StatusOK, page, err)
+}
+
+func (r *Relay) apiExport(w http.ResponseWriter, req *http.Request) {
+	var (
+		raw  []byte
+		err  error
+		ext  = "json"
+		kind = "application/json"
+	)
+	if req.URL.Query().Get("format") == "opml" {
+		raw, err = r.ExportOPML()
+		ext, kind = "opml", "text/x-opml; charset=utf-8"
+	} else {
+		raw, err = r.ExportJSON()
+	}
+	if err != nil {
+		answer(w, 0, nil, err)
+		return
+	}
+	w.Header().Set("Content-Type", kind)
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="feed-relay-%s.%s"`, time.Now().UTC().Format("2006-01-02"), ext))
+	w.Header().Set("Cache-Control", "no-store")
+	w.Write(raw)
+}
+
+type importRequest struct {
+	Data     string   `json:"data"`
+	Channels []string `json:"channels"`
+	DryRun   bool     `json:"dry_run"`
+}
+
+func (r *Relay) apiImport(w http.ResponseWriter, req *http.Request) {
+	var in importRequest
+	dec := json.NewDecoder(io.LimitReader(req.Body, 8<<20))
+	if err := dec.Decode(&in); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "That request is not valid: " + err.Error()})
+		return
+	}
+	feeds, format, err := r.ParseImport([]byte(in.Data))
+	if errors.Is(err, ErrImportFormat) {
+		writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": "This is not a feed-relay backup or an OPML file.", "code": "format"})
+		return
+	}
+	if err != nil {
+		answer(w, 0, nil, err)
+		return
+	}
+	res, err := r.ImportFeeds(feeds, in.Channels, format, in.DryRun, "console")
+	answer(w, http.StatusOK, res, err)
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
